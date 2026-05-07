@@ -1,0 +1,53 @@
+name: "Publish Release"
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest" # Untuk DMG/App (Opsional)
+            args: "--bundles dmg,app"
+          - platform: "ubuntu-22.04" # Untuk DEB/RPM
+            args: "--bundles deb,rpm"
+          - platform: "windows-latest" # Untuk EXE/MSI
+            args: "--bundles msi,exe"
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev adb
+
+      - name: install frontend dependencies
+        run: npm install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__ # tauri-action memanipulasi ini secara otomatis
+          releaseName: "CTS Verifier Pro v__VERSION__"
+          releaseBody: "Automated industrial build for CTS Verifier Installer."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

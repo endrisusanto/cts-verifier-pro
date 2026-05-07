@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "cts-verifier-pro",
+  "version": "1.0.0",
+  "identifier": "com.endripro.ctsverifier",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "CTS Verifier Installer",
+        "width": 500,
+        "height": 720,
+        "minWidth": 500,
+        "minHeight": 500,
+        "resizable": true,
+        "center": true,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "../apks/*"
+    ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "adb"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "android-tools"
+        ]
+      }
+    }
+  }
+}
