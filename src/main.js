@@ -116,11 +116,11 @@ window.addEventListener("DOMContentLoaded", () => {
     if (isAllSelected) {
       checkedDevices.clear();
       isAllSelected = false;
-      toggleAllBtn.textContent = "Select All";
+      toggleAllBtn.textContent = "Select";
     } else {
       devices.forEach(d => { if (d.status === 'device') checkedDevices.add(d.id); });
       isAllSelected = true;
-      toggleAllBtn.textContent = "Unselect All";
+      toggleAllBtn.textContent = "Unselect";
     }
     renderDevices();
     updateInstallButton();

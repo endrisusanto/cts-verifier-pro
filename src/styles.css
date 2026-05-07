@@ -109,12 +109,13 @@ main {
 }
 
 /* Progress Fill */
+/* Progress Fill Overlay */
 .progress-fill {
   position: absolute;
   top: 0; left: 0; height: 100%; width: 0%;
-  background: rgba(61, 220, 132, 0.05);
+  background: rgba(61, 220, 132, 0.12);
   border-right: 2px solid var(--accent);
-  transition: width 0.3s ease;
+  transition: width 0.4s cubic-bezier(0.1, 0.7, 1.0, 0.1);
   z-index: 0; pointer-events: none;
 }
 
