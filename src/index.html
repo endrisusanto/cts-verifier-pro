@@ -46,11 +46,19 @@
     </div>
   </footer>
 
+  <!-- Professional Error Modal -->
   <div id="error-modal" class="modal-overlay">
     <div class="modal">
-      <h2>Installation Error</h2>
-      <p id="error-message">Something went wrong during the installation process.</p>
-      <button class="btn btn-primary" onclick="document.getElementById('error-modal').style.display='none'">Dismiss</button>
+      <div class="modal-header">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--error);"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h2>Installation Error</h2>
+      </div>
+      <div class="modal-body">
+        <div id="error-message"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="document.getElementById('error-modal').style.display='none'">Dismiss</button>
+      </div>
     </div>
   </div>
 
