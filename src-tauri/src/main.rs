@@ -4,7 +4,9 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tauri::{AppHandle, Emitter, path::BaseDirectory, Manager};
-use std::path::PathBuf;
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Device {
@@ -29,9 +31,19 @@ struct LogPayload {
     progress: f32,
 }
 
+// Constant for Windows to prevent console window
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 #[tauri::command]
 async fn get_devices() -> Result<Vec<Device>, String> {
-    let output = Command::new("adb").arg("devices").output().map_err(|e| e.to_string())?;
+    let mut cmd = Command::new("adb");
+    cmd.arg("devices");
+    
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd.output().map_err(|e| e.to_string())?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut devices = Vec::new();
 
@@ -71,8 +83,13 @@ fn get_device_props(device_id: &str) -> std::collections::HashMap<String, String
         "ro.build.PDA", "ril.sw_ver", "ril.official_cscver",
     ];
     for prop in props_to_get {
-        let output = Command::new("adb").args(&["-s", device_id, "shell", "getprop", prop]).output();
-        if let Ok(out) = output {
+        let mut cmd = Command::new("adb");
+        cmd.args(&["-s", device_id, "shell", "getprop", prop]);
+        
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        if let Ok(out) = cmd.output() {
             let val = String::from_utf8_lossy(&out.stdout).trim().to_string();
             map.insert(prop.to_string(), val);
         }
@@ -101,13 +118,18 @@ async fn run_install_sequence(app: AppHandle, device_id: String) -> Result<(), S
     let run_adb = |args: Vec<&str>| -> Result<String, String> {
         let mut final_args = vec!["-s", &device_id];
         final_args.extend(args);
-        let output = Command::new("adb").args(&final_args).output()
-            .map_err(|e| format!("ADB error: {}", e))?;
+        
+        let mut cmd = Command::new("adb");
+        cmd.args(&final_args);
+        
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let output = cmd.output().map_err(|e| format!("ADB error: {}", e))?;
         if output.status.success() { Ok(String::from_utf8_lossy(&output.stdout).to_string()) }
         else { Err(String::from_utf8_lossy(&output.stderr).to_string()) }
     };
 
-    // Use Tauri's resource path resolution
     let resource_path = app.path().resolve("apks", BaseDirectory::Resource)
         .map_err(|e| format!("Resource error: {}", e))?;
 
@@ -119,20 +141,40 @@ async fn run_install_sequence(app: AppHandle, device_id: String) -> Result<(), S
     
     for apk in &apks { 
         if !apk.exists() { 
-            return Err(format!("APK not found in resources: {}", apk.file_name().unwrap().to_string_lossy())); 
+            return Err(format!("APK not found: {}", apk.file_name().unwrap().to_string_lossy())); 
         } 
     }
 
     log("Starting...", "info", 5.0);
+    
+    // Install APKs
     run_adb(vec!["install", "-r", "-d", &apks[0].to_string_lossy()]).map_err(|e| { log(&e, "error", 10.0); e })?;
     log("CtsVerifier.apk installed", "success", 30.0);
+    
     run_adb(vec!["install", "-r", "-d", &apks[1].to_string_lossy()]).map_err(|e| { log(&e, "error", 40.0); e })?;
-    log("CtsPermissionApp.apk installed", "success", 60.0);
-    run_adb(vec!["install", "-r", "-t", &apks[2].to_string_lossy()]).map_err(|e| { log(&e, "error", 70.0); e })?;
-    log("CtsEmptyDeviceOwner.apk installed", "success", 80.0);
-    let _ = run_adb(vec!["shell", "dpm", "set-device-owner", "--user", "0", "com.android.cts.emptydeviceowner/.EmptyDeviceAdmin"]);
-    let _ = run_adb(vec!["shell", "appops", "set", "com.android.cts.verifier", "android:read_device_identifiers", "allow"]);
-    let _ = run_adb(vec!["shell", "appops", "set", "com.android.cts.verifier", "MANAGE_EXTERNAL_STORAGE", "0"]);
+    log("CtsPermissionApp.apk installed", "success", 50.0);
+    
+    run_adb(vec!["install", "-r", "-t", &apks[2].to_string_lossy()]).map_err(|e| { log(&e, "error", 60.0); e })?;
+    log("CtsEmptyDeviceOwner.apk installed", "success", 70.0);
+
+    // Set Device Owner - Now with detailed logging
+    log("Configuring Device Owner...", "info", 80.0);
+    match run_adb(vec!["shell", "dpm", "set-device-owner", "--user", "0", "com.android.cts.emptydeviceowner/.EmptyDeviceAdmin"]) {
+        Ok(out) => log(&format!("DPM Result: {}", out.trim()), "success", 85.0),
+        Err(e) => {
+            log(&format!("DPM Failed: {}", e.trim()), "error", 85.0);
+            return Err(format!("Device Owner Error: {}", e));
+        }
+    }
+
+    // Grant Permissions
+    log("Granting AppOps permissions...", "info", 90.0);
+    let res1 = run_adb(vec!["shell", "appops", "set", "com.android.cts.verifier", "android:read_device_identifiers", "allow"]);
+    log(&format!("Read ID Perm: {}", res1.unwrap_or_else(|e| e)), "info", 95.0);
+    
+    let res2 = run_adb(vec!["shell", "appops", "set", "com.android.cts.verifier", "MANAGE_EXTERNAL_STORAGE", "0"]);
+    log(&format!("Storage Perm: {}", res2.unwrap_or_else(|e| e)), "info", 98.0);
+
     log("DONE", "success", 100.0);
     Ok(())
 }
