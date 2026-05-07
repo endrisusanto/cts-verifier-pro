@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTS Verifier Pro | Industrial Automation Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --card: #111;
+            --accent: #3ddc84;
+            --blue: #4285f4;
+            --text: #ffffff;
+            --text-dim: #888;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        header {
+            padding: 4rem 0;
+            text-align: center;
+        }
+
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 2rem;
+            filter: drop-shadow(0 0 20px rgba(61, 220, 132, 0.3));
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            letter-spacing: -2px;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #fff, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-dim);
+            max-width: 600px;
+            margin: 0 auto 3rem;
+        }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 4rem;
+        }
+
+        .download-card {
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .download-card:hover {
+            border-color: var(--blue);
+            transform: translateY(-5px);
+            background: #161616;
+        }
+
+        .platform-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .platform-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .file-info {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        .btn {
+            display: inline-block;
+            background: var(--blue);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 700;
+            text-decoration: none;
+            margin-top: 1.5rem;
+            width: 100%;
+            text-align: center;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            padding: 4rem 0;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .feature-item h3 {
+            color: var(--accent);
+            margin-bottom: 0.75rem;
+        }
+
+        .feature-item p {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        footer {
+            padding: 4rem 0;
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .glow {
+            position: absolute;
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(66, 133, 244, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow"></div>
+    <div class="container">
+        <header>
+            <svg class="logo" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path opacity="0.2" d="M49.8535 123.492C47.8751 123.023 46.2193 121.926 43.9021 119.549C40.0315 115.578 36.8904 113.925 31.4309 112.985C25.7674 112.01 23.2506 109.905 21.7375 104.877C19.8698 98.6708 17.9177 95.6985 13.6285 92.5305C8.7629 88.9366 7.51452 85.7674 8.70211 80.0242C9.80208 74.7048 9.38087 70.9229 7.14689 66.0604C4.48145 60.2587 4.81049 57.1586 8.5962 52.4053C12.0668 48.0478 13.1561 45.1674 13.6759 38.9737C14.2004 32.7233 15.9394 30.159 21.0608 28.0837C25.3351 26.3518 28.9917 23.3452 31.0189 19.8957C33.3632 15.9068 33.7054 15.4495 35.1579 14.3658C37.5018 12.6171 39.3969 12.1325 43.0061 12.3588C49.2755 12.7519 52.6358 11.9991 56.846 9.25832C62.3354 5.68473 65.6639 5.68473 71.1534 9.25832C75.3636 11.9991 78.7239 12.7519 84.9933 12.3588C90.922 11.987 93.389 13.5434 97.0028 19.9355C98.7937 23.1032 102.454 26.1862 106.461 27.9007C112.167 30.3428 113.825 32.5717 114.246 38.3638C114.702 44.6367 115.988 48.144 119.395 52.4053C123.189 57.1501 123.52 60.2531 120.852 66.0604C118.619 70.9229 118.197 74.7048 119.297 80.0242C120.485 85.7674 119.236 88.9366 114.371 92.5305C110.082 95.6985 108.13 98.6708 106.262 104.877C104.749 109.905 102.232 112.01 96.5685 112.985C91.0974 113.927 87.9527 115.585 84.0973 119.562C79.8233 123.969 76.7594 124.697 70.7842 122.721C65.8971 121.106 62.1344 121.099 57.2668 122.697C53.8571 123.816 52.0396 124.011 49.8535 123.492V123.492Z" fill="white"/>
+                <path d="M49.8535 122.321C47.8751 121.851 46.2193 120.754 43.9021 118.377C40.0315 114.407 36.8904 112.753 31.4309 111.814C25.7674 110.839 23.2506 108.733 21.7375 103.706C19.8698 97.499 17.9177 94.5267 13.6285 91.3586C8.7629 87.7647 7.51452 84.5955 8.70211 78.8524C9.80208 73.5329 9.38087 69.751 7.14689 64.8885C4.48145 59.0868 4.81049 55.9867 8.5962 51.2335C12.0668 46.8759 13.1561 43.9955 13.6759 37.8018C14.2004 31.5514 15.9394 28.9871 21.0608 26.9119C25.3351 25.1799 28.9917 22.1733 31.0189 18.7238C33.3632 14.7349 33.7054 14.2776 35.1579 13.194C37.5018 11.4452 39.3969 10.9606 43.0061 11.1869C49.2755 11.58 52.6358 10.8273 56.846 8.08645C62.3354 4.51285 65.6639 4.51285 71.1534 8.08645C75.3636 10.8273 78.7239 11.58 84.9933 11.1869C90.922 10.8151 93.389 12.3715 97.0028 18.7636C98.7937 21.9314 102.454 25.0143 106.461 26.7289C112.167 29.1709 113.825 31.3998 114.246 37.192C114.702 43.4648 115.988 46.9721 119.395 51.2335C123.189 55.9782 123.52 59.0812 120.852 64.8885C118.619 69.751 118.197 73.5329 119.297 78.8524C120.485 84.5955 119.236 87.7647 114.371 91.3586C110.082 94.5267 108.13 97.499 106.262 103.706C104.749 108.733 102.232 110.839 96.5685 111.814C91.0974 112.755 87.9527 114.414 84.0973 118.39C79.8233 122.798 76.7594 123.525 70.7842 121.55C65.8971 119.934 62.1344 119.927 57.2668 121.525C53.8571 122.644 52.0396 122.839 49.8535 122.321V122.321Z" fill="white"/>
+            </svg>
+            <h1>CTS Verifier Pro</h1>
+            <p class="subtitle">Industrial-grade Android automation suite for Google Build Approval testing. Fast, parallel, and reliable.</p>
+        </header>
+
+        <div class="download-grid">
+            <a href="https://github.com/endrisusanto/cts-verifier-pro/releases/latest" class="download-card">
+                <span class="platform-icon">🪟</span>
+                <span class="platform-name">Windows</span>
+                <span class="file-info">EXE / MSI (x64)</span>
+                <div class="btn">Download for Windows</div>
+            </a>
+            <a href="https://github.com/endrisusanto/cts-verifier-pro/releases/latest" class="download-card">
+                <span class="platform-icon">🐧</span>
+                <span class="platform-name">Linux (Fedora)</span>
+                <span class="file-info">RPM Package</span>
+                <div class="btn">Download RPM</div>
+            </a>
+            <a href="https://github.com/endrisusanto/cts-verifier-pro/releases/latest" class="download-card">
+                <span class="platform-icon">📦</span>
+                <span class="platform-name">Linux (Ubuntu/Debian)</span>
+                <span class="file-info">DEB Package</span>
+                <div class="btn">Download DEB</div>
+            </a>
+        </div>
+
+        <div class="features">
+            <div class="feature-item">
+                <h3>Parallel Execution</h3>
+                <p>Install APKs to multiple connected devices simultaneously, saving hours of manual work.</p>
+            </div>
+            <div class="feature-item">
+                <h3>Device Intelligence</h3>
+                <p>Automatic detection of model, SDK, security patch, and CSC region properties.</p>
+            </div>
+            <div class="feature-item">
+                <h3>Auto-Provisioning</h3>
+                <p>Handles Device Owner setting, permission granting, and app configurations automatically.</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2026 Endri Pro. Built with Tauri & Rust.</p>
+            <p style="margin-top: 10px;"><a href="https://github.com/endrisusanto/cts-verifier-pro" style="color: var(--blue);">View Source on GitHub</a></p>
+        </footer>
+    </div>
+</body>
+</html>
