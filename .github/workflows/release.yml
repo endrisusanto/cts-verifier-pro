@@ -48,6 +48,6 @@ jobs:
           tagName: v__VERSION__ # tauri-action memanipulasi ini secara otomatis
           releaseName: "CTS Verifier Pro v__VERSION__"
           releaseBody: "Automated industrial build for CTS Verifier Installer."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

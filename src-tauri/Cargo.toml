@@ -1,6 +1,6 @@
 [package]
 name = "cts-verifier-installer"
-version = "1.0.0"
+version = "1.0.2"
 description = "CTS Verifier Installer - Android 16"
 authors = ["Endri Pro"]
 edition = "2021"
