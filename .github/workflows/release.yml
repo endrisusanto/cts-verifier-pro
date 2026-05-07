@@ -17,8 +17,8 @@ jobs:
             args: "--bundles dmg,app"
           - platform: "ubuntu-22.04" # Untuk DEB/RPM
             args: "--bundles deb,rpm"
-          - platform: "windows-latest" # Untuk EXE/MSI
-            args: "--bundles msi,exe"
+          - platform: "windows-latest" # Untuk MSI/NSIS (EXE)
+            args: "--bundles msi,nsis"
 
     runs-on: ${{ matrix.platform }}
     steps:
