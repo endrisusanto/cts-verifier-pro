@@ -26,3 +26,10 @@ releases/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Project data
+results/
+*.txt
+results.db
+window_dump*.xml
+test_pull/
