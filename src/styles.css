@@ -109,29 +109,82 @@ main {
 }
 
 /* Progress Fill */
-/* Progress Fill Overlay */
+/* Progress Fill Overlay - Pure Background Fill */
 .progress-fill {
   position: absolute;
   top: 0; left: 0; height: 100%; width: 0%;
-  background: rgba(61, 220, 132, 0.12);
-  border-right: 2px solid var(--accent);
+  background: rgba(61, 220, 132, 0.15); /* Sedikit lebih pekat */
   transition: width 0.4s cubic-bezier(0.1, 0.7, 1.0, 0.1);
   z-index: 0; pointer-events: none;
 }
 
-/* Checkbox */
-.cb-container { width: 18px; height: 18px; position: relative; z-index: 1; }
-.cb-container input { position: absolute; opacity: 0; cursor: pointer; }
-.checkmark-svg { width: 18px; height: 18px; stroke: #444; stroke-width: 2.5; fill: none; }
+/* Checkbox - Fixed Size */
+.cb-container { 
+  width: 18px; 
+  height: 18px; 
+  position: relative; 
+  z-index: 1; 
+  flex-shrink: 0; /* Mencegah checkbox tergencet saat resize */
+}
+
+.cb-container input { position: absolute; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+.checkmark-svg { 
+  width: 18px; 
+  height: 18px; 
+  stroke: #444; 
+  stroke-width: 2.5; 
+  fill: none; 
+  display: block;
+}
+
 .cb-container input:checked ~ .checkmark-svg { stroke: var(--accent); }
-.checkmark-svg path { opacity: 0; }
+.checkmark-svg path { opacity: 0; transition: opacity 0.2s ease; }
 .cb-container input:checked ~ .checkmark-svg path { opacity: 1; }
 
-/* Console */
+.device-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Console & Resizer */
 .console {
   position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
+  min-height: 40px; max-height: 80vh;
   background: #050505; border-top: 1px solid var(--border);
   display: flex; flex-direction: column; z-index: 1000;
+}
+
+.resizer {
+  height: 4px;
+  width: 100%;
+  background: transparent;
+  position: absolute;
+  top: -2px;
+  cursor: ns-resize;
+  transition: background 0.2s;
+  z-index: 1001;
+}
+
+.resizer:hover {
+  background: var(--blue);
+}
+
+.resizer::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px; height: 2px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
 }
 
 .console-header {
@@ -150,18 +203,100 @@ main {
 .log-success { color: var(--accent); }
 .log-error { color: var(--error); }
 
+/* Premium Toggle Switch */
+.auto-pass-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  background: rgba(255, 179, 0, 0.03);
+  border: 1px solid rgba(255, 179, 0, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.auto-pass-container:hover {
+  background: rgba(255, 179, 0, 0.08);
+  border-color: rgba(255, 179, 0, 0.3);
+}
+
+.auto-pass-container span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  transition: color 0.3s ease;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+}
+
+.switch input { opacity: 0; width: 0; height: 0; }
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #333;
+  transition: .4s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 12px; width: 12px;
+  left: 3px; bottom: 3px;
+  background-color: #666;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider { background-color: #ffb300; }
+input:checked + .slider:before { transform: translateX(14px); background-color: white; }
+input:checked ~ .auto-pass-label { color: #ffb300; }
+
+.auto-pass-container:has(input:checked) {
+  background: rgba(255, 179, 0, 0.1);
+  border-color: rgba(255, 179, 0, 0.5);
+}
+
 .modal-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.85); display: none;
-  justify-content: center; align-items: center; z-index: 2000;
-  backdrop-filter: blur(4px);
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100vw; 
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.9); 
+  display: none; /* Dikontrol via JS */
+  justify-content: center; 
+  align-items: center; 
+  z-index: 9999; /* Pastikan di atas konsol (1000) */
+  backdrop-filter: blur(8px);
 }
 
 .modal {
-  background: #111; border: 1px solid var(--border); border-radius: 12px;
-  width: 90%; max-width: 500px; max-height: 80vh;
-  display: flex; flex-direction: column; overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  background: #111; 
+  border: 1px solid rgba(255, 77, 77, 0.3); 
+  border-radius: 12px;
+  width: 90%; 
+  max-width: 500px; 
+  max-height: 70vh;
+  display: flex; 
+  flex-direction: column; 
+  overflow: hidden;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+  animation: modalSlideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes modalSlideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 .modal-header {

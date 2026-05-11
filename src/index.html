@@ -26,8 +26,20 @@
     </div>
     
     <div class="controls">
+      <label class="auto-pass-container">
+        <div class="switch">
+          <input type="checkbox" id="auto-pass-checkbox">
+          <span class="slider"></span>
+        </div>
+        <span class="auto-pass-label">Auto-Pass</span>
+      </label>
       <button id="toggle-all" class="btn btn-ghost">Select</button>
+      <button id="pass-selected" class="btn btn-ghost" style="color: #ffb300; border-color: rgba(255,179,0,0.2);" disabled>Pass Selected</button>
+      <button id="emergency-stop" class="btn btn-ghost" style="color: #ff4d4d; border-color: rgba(255,77,77,0.2); display: none;">Stop</button>
       <button id="refresh-btn" class="btn btn-ghost">Refresh</button>
+      <button id="settings-btn" class="btn btn-ghost" title="Settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
       <button id="install-selected" class="btn btn-primary" disabled>Install Selected</button>
     </div>
   </header>
@@ -36,9 +48,58 @@
     <!-- Device cards injected here -->
   </main>
 
-  <footer class="console">
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal" style="border-color: var(--blue);">
+      <div class="modal-header">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <h2>Application Settings</h2>
+      </div>
+      <div class="modal-body">
+        <div class="setting-item">
+          <label style="display: block; font-size: 0.65rem; color: #888; text-transform: uppercase; margin-bottom: 8px;">Results Folder Path</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="results-path-input" readonly placeholder="Default: ./results" style="flex: 1; background: #000; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 0.7rem;">
+            <button id="browse-path-btn" class="btn btn-ghost" style="padding: 0 12px; font-size: 0.7rem;">Browse</button>
+          </div>
+        </div>
+
+        <div class="setting-item" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+          <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #fff;">
+            <span>Simple Mode (Basic Tests Only)</span>
+            <div class="switch">
+              <input type="checkbox" id="simple-mode-setting">
+              <span class="slider"></span>
+            </div>
+          </label>
+          <div style="font-size: 0.65rem; color: #888; margin-top: 4px;">Only pass BYOD Managed Provisioning & Device Owner Tests instead of all 100+ tests.</div>
+        </div>
+
+        <div class="setting-item" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+          <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #fff;">
+            <span>Execution Method: Manual (Tap Tap)</span>
+            <div class="switch">
+              <input type="checkbox" id="manual-tap-setting">
+              <span class="slider"></span>
+            </div>
+          </label>
+          <div style="font-size: 0.65rem; color: #888; margin-top: 4px;">If enabled, uses UI Navigation (Tap Tap) instead of Database Injection.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="document.getElementById('settings-modal').style.display='none'">Cancel</button>
+        <button id="save-settings-btn" class="btn btn-primary" style="background: var(--blue);">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="console" id="resizable-console">
+    <div id="console-resizer" class="resizer"></div>
     <div class="console-header">
-      <span>Output Console</span>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <span>Output Console</span>
+        <button id="clear-log-btn" class="btn-text" style="color: var(--blue); font-size: 0.6rem; background: transparent; border: none; cursor: pointer; text-transform: uppercase;">[ Clear Log ]</button>
+      </div>
       <span id="app-status">Standby</span>
     </div>
     <div id="log-output">
