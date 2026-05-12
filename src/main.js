@@ -1,21 +1,24 @@
 window.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM Content Loaded - Initializing...");
   const { invoke } = window.__TAURI__.core;
   const { listen } = window.__TAURI__.event;
   const { open } = window.__TAURI__.dialog;
 
   const deviceListEl = document.getElementById("device-list");
   const refreshBtn = document.getElementById("refresh-btn");
-  const installBtn = document.getElementById("install-selected");
-  const passBtn = document.getElementById("pass-selected");
+  const runRealTestBtn = document.getElementById("run-real-test");
   const stopBtn = document.getElementById("emergency-stop");
   const toggleAllBtn = document.getElementById("toggle-all");
   const logOutput = document.getElementById("log-output");
   const appStatus = document.getElementById("app-status");
   const errorModal = document.getElementById("error-modal");
   const errorMessage = document.getElementById("error-message");
-  const consoleEl = document.getElementById("resizable-console");
-  const resizer = document.getElementById("console-resizer");
+  const getTestcasesBtn = document.getElementById("get-testcases-btn");
+  const taskSelector = document.getElementById("task-selector");
+  const skipPreconditions = document.getElementById("skip-preconditions");
+  const getResultsBtn = document.getElementById("get-results-btn");
   const clearLogBtn = document.getElementById("clear-log-btn");
+  const checklistBody = document.getElementById("checklist-body");
 
   // Settings Elements
   const settingsBtn = document.getElementById("settings-btn");
@@ -23,8 +26,6 @@ window.addEventListener("DOMContentLoaded", () => {
   const resultsPathInput = document.getElementById("results-path-input");
   const browsePathBtn = document.getElementById("browse-path-btn");
   const saveSettingsBtn = document.getElementById("save-settings-btn");
-  const simpleModeSetting = document.getElementById("simple-mode-setting");
-  const manualTapSetting = document.getElementById("manual-tap-setting");
 
   let devices = [];
   let checkedDevices = new Set();
@@ -32,12 +33,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // --- Settings Logic ---
   let customResultsPath = localStorage.getItem("resultsPath") || "";
-  let isSimpleMode = localStorage.getItem("simpleMode") === "true";
-  let isManualTap = localStorage.getItem("manualTap") === "true";
 
   resultsPathInput.value = customResultsPath;
-  simpleModeSetting.checked = isSimpleMode;
-  manualTapSetting.checked = isManualTap;
 
   settingsBtn.addEventListener("click", () => {
     settingsModal.style.display = "flex";
@@ -56,15 +53,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
   saveSettingsBtn.addEventListener("click", () => {
     customResultsPath = resultsPathInput.value;
-    isSimpleMode = simpleModeSetting.checked;
-    isManualTap = manualTapSetting.checked;
-
     localStorage.setItem("resultsPath", customResultsPath);
-    localStorage.setItem("simpleMode", isSimpleMode);
-    localStorage.setItem("manualTap", isManualTap);
 
     settingsModal.style.display = "none";
-    appendLog("SYSTEM", `Settings saved. Results path: ${customResultsPath || './results'}, Simple Mode: ${isSimpleMode}`, "success");
+    appendLog("SYSTEM", `Settings saved. Results path: ${customResultsPath || './results'}`, "success");
   });
 
   clearLogBtn.addEventListener("click", () => {
@@ -73,21 +65,99 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // Force hide modal on startup
-  errorModal.style.display = "none";
-  settingsModal.style.display = "none";
+  if (errorModal) errorModal.style.display = "none";
+  if (settingsModal) settingsModal.style.display = "none";
 
-  // --- Resizable Console Logic ---
-  let isResizing = false;
-  resizer.addEventListener("mousedown", () => { isResizing = true; document.body.style.cursor = "ns-resize"; });
-  document.addEventListener("mousemove", (e) => {
-    if (!isResizing) return;
-    const height = window.innerHeight - e.clientY;
-    if (height > 40 && height < window.innerHeight * 0.8) consoleEl.style.height = `${height}px`;
+  // --- Fetch Test Cases Data ---
+  let testCaseAvailable = null;
+  let testCaseToActivity = null;
+
+  async function loadTestCasesData() {
+    try {
+      const res1 = await fetch("assets/ListTestCaseAvailable.json");
+      testCaseAvailable = await res1.json();
+      const res2 = await fetch("assets/TestCaseToActivity.json");
+      testCaseToActivity = await res2.json();
+    } catch (err) {
+      appendLog("SYSTEM", "Failed to load test case JSON: " + err, "error");
+    }
+  }
+  loadTestCasesData();
+
+  getTestcasesBtn.addEventListener("click", () => {
+    if (checkedDevices.size === 0) {
+      showError("Please select at least one device first.");
+      return;
+    }
+    if (!testCaseAvailable || !testCaseToActivity) {
+      showError("Test case data is still loading or failed to load.");
+      return;
+    }
+    
+    checklistBody.innerHTML = "";
+    const task = taskSelector.value;
+    const allTests = testCaseAvailable.CtsVerModule || [];
+    
+    let filteredTests = [];
+    if (task === "cts-verifier-normal") {
+       filteredTests = allTests.filter(t => t === "BYODManagedProvisioningNormal" || t === "DeviceOwnerTestsNormal");
+    } else if (task === "cts-verifier") {
+       filteredTests = allTests.filter(t => t !== "BYODManagedProvisioningNormal" && t !== "DeviceOwnerTestsNormal");
+    } else if (task === "wts-verifier") {
+       // WTS specific logic later
+       filteredTests = allTests.filter(t => t.startsWith("Wts")); 
+    }
+
+    // Map to activity using TestCaseToActivity.json
+    // The keys in TestCaseToActivity often have spaces (e.g. "Device Owner Tests") while ListTestCaseAvailable has no spaces.
+    // Let's do a loose matching or known mapping
+    const normalizedToKeys = Object.keys(testCaseToActivity).map(k => ({
+      original: k,
+      stripped: k.replace(/\s+/g, '')
+    }));
+
+    let count = 0;
+    filteredTests.forEach((tc) => {
+      // Find matching activity
+      let activity = "";
+      if (tc === "BYODManagedProvisioningNormal" || tc === "BYODManagedProvisioning") {
+         activity = testCaseToActivity["BYOD Provisioning tests"];
+      } else if (tc === "DeviceOwnerTestsNormal" || tc === "DeviceOwnerTests") {
+         activity = testCaseToActivity["Device Owner Tests"];
+      } else {
+         const match = normalizedToKeys.find(m => m.stripped.toLowerCase() === tc.toLowerCase());
+         if (match) activity = testCaseToActivity[match.original];
+      }
+      
+      if (!activity) {
+         // Skip tests that don't have a direct activity mapping in the JSON
+         return;
+      }
+
+      count++;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td style="text-align: center;">
+          <label class="cb-container" style="display: inline-block; width: 16px; height: 16px;">
+            <input type="checkbox" checked class="tc-checkbox" data-activity="${activity}">
+            <svg class="checkmark-svg" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
+              <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.1)" fill="none"/>
+              <path d="M7 12l3 3 7-7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </label>
+        </td>
+        <td style="font-family: monospace; color: #ccc;">${tc}</td>
+        <td style="font-weight: bold; color: #555;" class="tc-result">-</td>
+        <td style="color: #666;" class="tc-time">-</td>
+      `;
+      checklistBody.appendChild(tr);
+    });
+    appendLog("SYSTEM", `Loaded ${count} test cases for Task ${task.toUpperCase()}.`, "success");
   });
-  document.addEventListener("mouseup", () => { isResizing = false; document.body.style.cursor = "default"; });
 
   // --- Core App Logic ---
   async function refreshDevices(isManual = false) {
+    if (isManual) appendLog("SYSTEM", "User requested device refresh...", "info");
     setLoadingState(true, "Scanning...");
     appendLog("SYSTEM", "Scanning for Android devices via ADB...", "info");
     try {
@@ -172,7 +242,7 @@ window.addEventListener("DOMContentLoaded", () => {
           card.classList.remove('checked');
           checkbox.checked = false;
         }
-        updateInstallButton();
+        updateRunButton();
       };
 
       card.addEventListener('click', (e) => {
@@ -233,6 +303,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function appendLog(deviceId, message, status) {
+    if (!logOutput) return;
     const line = document.createElement("div");
     line.className = `log-line log-${status}`;
     line.innerHTML = `<span class="log-device">[${deviceId}]</span> ${message}`;
@@ -246,23 +317,23 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function setLoadingState(loading, statusText = "Standby") {
-    refreshBtn.disabled = loading;
-    installBtn.disabled = loading;
-    passBtn.disabled = loading;
-    toggleAllBtn.disabled = loading;
-    settingsBtn.disabled = loading;
-    stopBtn.style.display = loading ? "inline-block" : "none";
-    appStatus.textContent = statusText;
-    if (!loading) updateInstallButton();
+    if (refreshBtn) refreshBtn.disabled = loading;
+    if (getResultsBtn) getResultsBtn.disabled = loading;
+    if (runRealTestBtn) runRealTestBtn.disabled = loading;
+    if (settingsBtn) settingsBtn.disabled = loading;
+    if (stopBtn) stopBtn.style.display = loading ? "inline-block" : "none";
+    if (appStatus) appStatus.textContent = statusText;
+    if (!loading) updateRunButton();
   }
 
-  function updateInstallButton() {
+  function updateRunButton() {
     const hasSelection = checkedDevices.size > 0;
-    installBtn.disabled = !hasSelection;
-    passBtn.disabled = !hasSelection;
-    installBtn.textContent = `Install (${checkedDevices.size})`;
-    passBtn.textContent = `Pass (${checkedDevices.size})`;
+    getResultsBtn.disabled = !hasSelection;
+    runRealTestBtn.disabled = !hasSelection;
+    runRealTestBtn.textContent = `Run Selected (${checkedDevices.size})`;
   }
+
+
 
   toggleAllBtn.addEventListener('click', () => {
     if (isAllSelected) {
@@ -275,31 +346,80 @@ window.addEventListener("DOMContentLoaded", () => {
       toggleAllBtn.textContent = "Unselect";
     }
     renderDevices();
-    updateInstallButton();
+    updateRunButton();
   });
 
-  async function startParallelInstall() {
+
+  async function startRealInstrumentation() {
     const selectedIds = Array.from(checkedDevices);
-    const shouldAutoPass = document.getElementById("auto-pass-checkbox").checked;
-    setLoadingState(true, shouldAutoPass ? "Installing & Passing..." : "Installing...");
-    appendLog("SYSTEM", `Starting process on ${selectedIds.length} devices...`, "info");
+    
+    // Get selected tests from table
+    const selectedTests = [];
+    document.querySelectorAll('.tc-checkbox:checked').forEach(cb => {
+       selectedTests.push(cb.getAttribute('data-activity'));
+    });
+
+    if (selectedTests.length === 0) {
+      showError("Please check at least one testcase to run.");
+      return;
+    }
+
+    setLoadingState(true, "Running Real Tests...");
+    appendLog("SYSTEM", `Starting real instrumentation on ${selectedIds.length} devices for ${selectedTests.length} tests...`, "info");
+
+    const planStr = taskSelector.value === "cts-verifier-normal" ? "normal" : "full";
 
     const promises = selectedIds.map(async (id) => {
-      const deviceObj = devices.find(d => d.id === id);
-      try {
-        await invoke("run_install_sequence", { deviceId: id });
-        if (shouldAutoPass) {
-          await invoke("run_auto_pass_sequence", {
-            deviceId: id,
-            folderName: deviceObj ? getFolderName(deviceObj) : null,
-            resultsPath: customResultsPath || null,
-            simpleMode: isSimpleMode,
-            manualTap: isManualTap
-          });
+      // 1. Run Preconditions if not skipped
+      if (!skipPreconditions.checked) {
+        appendLog(id, "Running Preconditions (Install & Setup)...", "info");
+        try {
+          await invoke("run_install_sequence", { deviceId: id, plan: planStr });
+        } catch(err) {
+          appendLog(id, "Preconditions failed: " + err, "error");
+          // we might want to continue or stop? usually we continue or fail device. Let's continue.
         }
-      } catch (err) {
-        appendLog(id, err, "error");
-        showError(`Sequence failed for ${id}: ${err}`);
+      }
+
+      // 2. Run selected tests
+      for (const testClass of selectedTests) {
+         // Find row in table for this test
+         const row = Array.from(document.querySelectorAll('#checklist-body tr')).find(r => 
+           r.querySelector('.tc-checkbox')?.dataset.activity === testClass
+         );
+         const resultCell = row?.querySelector('.tc-result');
+         const timeCell = row?.querySelector('.tc-time');
+         
+         if (resultCell) {
+            resultCell.textContent = "RUNNING";
+            resultCell.style.color = "#4285f4";
+         }
+         
+         const startTime = Date.now();
+         try {
+           const resultStatus = await invoke("run_instrumentation_test", {
+             deviceId: id,
+             testClass: testClass
+           });
+           
+           if (resultCell) {
+              resultCell.textContent = resultStatus ? resultStatus.toUpperCase() : "DONE";
+              if (resultStatus === "Pass") resultCell.style.color = "#3ddc84";
+              else if (resultStatus === "Fail") resultCell.style.color = "#ff4d4d";
+              else resultCell.style.color = "#888";
+           }
+         } catch(err) {
+           appendLog(id, `Test Failed: ${err}`, "error");
+           if (resultCell) {
+              resultCell.textContent = "ERROR";
+              resultCell.style.color = "#ff4d4d";
+           }
+         } finally {
+           if (timeCell) {
+              const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+              timeCell.textContent = `${duration}s`;
+           }
+         }
       }
     });
 
@@ -307,23 +427,23 @@ window.addEventListener("DOMContentLoaded", () => {
     setLoadingState(false);
   }
 
-  async function startManualPass() {
+  async function startGetResults() {
     const selectedIds = Array.from(checkedDevices);
-    setLoadingState(true, "Auto Passing...");
-    appendLog("SYSTEM", `Starting manual Auto-Pass on ${selectedIds.length} devices...`, "info");
+    setLoadingState(true, "Pulling Results...");
+    appendLog("SYSTEM", `Pulling results for ${selectedIds.length} devices...`, "info");
 
-    const promises = selectedIds.map(id => {
+    const promises = selectedIds.map(async (id) => {
       const deviceObj = devices.find(d => d.id === id);
-      return invoke("run_auto_pass_sequence", {
-        deviceId: id,
-        folderName: deviceObj ? getFolderName(deviceObj) : null,
-        resultsPath: customResultsPath || null,
-        simpleMode: isSimpleMode,
-        manualTap: isManualTap
-      }).catch(err => {
-        appendLog(id, err, "error");
-        showError(`Pass failed for ${id}: ${err}`);
-      });
+      try {
+        const path = await invoke("pull_results", {
+          deviceId: id,
+          folderName: deviceObj ? getFolderName(deviceObj) : null,
+          basePath: customResultsPath || null
+        });
+        appendLog(id, `Results saved to: ${path}`, "success");
+      } catch(err) {
+        appendLog(id, `Failed to pull results: ${err}`, "error");
+      }
     });
 
     await Promise.all(promises);
@@ -341,8 +461,8 @@ window.addEventListener("DOMContentLoaded", () => {
     appendLog(device_id, message, status);
   });
 
-  installBtn.addEventListener("click", startParallelInstall);
-  passBtn.addEventListener("click", startManualPass);
+  runRealTestBtn.addEventListener("click", startRealInstrumentation);
+  getResultsBtn.addEventListener("click", startGetResults);
   stopBtn.addEventListener("click", () => {
     invoke("emergency_stop");
     appendLog("SYSTEM", "Emergency Stop Requested!", "error");

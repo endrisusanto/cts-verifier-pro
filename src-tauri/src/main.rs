@@ -2,13 +2,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
+
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::{AppHandle, Emitter, path::BaseDirectory, Manager};
-use std::time::Duration;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+use tauri::{path::BaseDirectory, AppHandle, Emitter, Manager};
 use tauri::State;
+use std::process::Stdio;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command as AsyncCommand;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -43,6 +47,82 @@ fn execute_adb(device_id: &str, args: Vec<&str>) -> Result<String, String> {
     else { Err(String::from_utf8_lossy(&output.stderr).to_string()) }
 }
 
+fn execute_adb_best_effort(device_id: &str, args: Vec<&str>) -> String {
+    execute_adb(device_id, args).unwrap_or_default().trim().to_string()
+}
+
+fn normalize_android_resource_version(release: &str, oneui: &str) -> String {
+    let oneui_version = oneui.trim().parse::<u32>().unwrap_or(0);
+    let release = release.trim();
+
+    if release.starts_with("16") && oneui_version >= 80500 {
+        "16.1".to_string()
+    } else if release.starts_with("16") {
+        "16".to_string()
+    } else if release.starts_with("15") {
+        "15".to_string()
+    } else if release.starts_with("14") {
+        "14".to_string()
+    } else {
+        release.split('.').next().unwrap_or("15").to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_android_resource_version;
+
+    #[test]
+    fn detects_samsung_android_16_1_from_oneui_85() {
+        assert_eq!(normalize_android_resource_version("16", "80500"), "16.1");
+    }
+
+    #[test]
+    fn keeps_plain_android_16_on_older_oneui() {
+        assert_eq!(normalize_android_resource_version("16", "80000"), "16");
+    }
+}
+
+fn resolve_apk_resource_path(app: &AppHandle, device_id: &str, plan: &str) -> Result<(PathBuf, String), String> {
+    let release = execute_adb_best_effort(device_id, vec!["shell", "getprop", "ro.build.version.release"]);
+    let oneui = execute_adb_best_effort(device_id, vec!["shell", "getprop", "ro.build.version.oneui"]);
+    let normalized = normalize_android_resource_version(&release, &oneui);
+    
+    let plan_folder = if plan.to_lowercase() == "normal" { "Normal" } else { "Full" };
+    let base_path = app.path().resolve(format!("apks/{}", plan_folder), BaseDirectory::Resource).map_err(|e| format!("Resource error: {}", e))?;
+
+    let normalized_path = base_path.join(&normalized);
+    if normalized_path.exists() {
+        return Ok((normalized_path, format!("{}/{}", plan_folder, normalized)));
+    }
+
+    let release_major = release.split('.').next().unwrap_or("15");
+    let release_path = base_path.join(release_major);
+    if release_path.exists() {
+        return Ok((release_path, format!("{}/{}", plan_folder, release_major)));
+    }
+
+    Ok((base_path, format!("{}/default", plan_folder)))
+}
+
+fn install_apk(device_id: &str, apk_path: &Path, extra_flags: &[&str]) -> Result<(), String> {
+    if !apk_path.exists() {
+        return Err(format!("Missing APK: {}", apk_path.display()));
+    }
+
+    let apk = apk_path.to_string_lossy();
+    let mut args = vec!["install", "-r", "-d"];
+    args.extend(extra_flags.iter().copied());
+    args.push(&apk);
+    execute_adb(device_id, args).map(|_| ())
+}
+
+fn install_optional_apk(device_id: &str, apk_path: &Path) {
+    if apk_path.exists() {
+        let _ = install_apk(device_id, apk_path, &["-g", "-t"]);
+    }
+}
+
 #[tauri::command]
 fn emergency_stop(state: tauri::State<'_, AppState>) {
     state.should_stop.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -69,7 +149,11 @@ async fn get_devices() -> Result<Vec<Device>, String> {
                     id, status,
                     model: props.get("ro.product.model").cloned().unwrap_or_default(),
                     version: props.get("ro.build.version.release").cloned().unwrap_or_default(),
-                    sdk: props.get("ro.system.build.version.sdk_full").cloned().unwrap_or_default(),
+                    sdk: props.get("ro.system.build.version.sdk_full")
+                        .filter(|v| !v.is_empty())
+                        .or_else(|| props.get("ro.build.version.sdk"))
+                        .cloned()
+                        .unwrap_or_default(),
                     security_patch: props.get("ro.build.version.security_patch").cloned().unwrap_or_default(),
                     carrier: props.get("ro.csc.sales_code").cloned().unwrap_or_default(),
                     region: props.get("ro.csc.country_code").cloned().unwrap_or_default(),
@@ -85,7 +169,19 @@ async fn get_devices() -> Result<Vec<Device>, String> {
 
 fn get_device_props(device_id: &str) -> std::collections::HashMap<String, String> {
     let mut map = std::collections::HashMap::new();
-    let props = vec!["ro.product.model", "ro.build.version.release", "ro.system.build.version.sdk_full", "ro.build.version.security_patch", "ro.csc.sales_code", "ro.csc.country_code", "ro.build.PDA", "ril.sw_ver", "ril.official_cscver"];
+    let props = vec![
+        "ro.product.model",
+        "ro.build.version.release",
+        "ro.build.version.sdk",
+        "ro.system.build.version.sdk_full",
+        "ro.build.version.security_patch",
+        "ro.csc.sales_code",
+        "ro.csc.country_code",
+        "ro.build.PDA",
+        "ril.sw_ver",
+        "ril.official_cscver",
+        "ro.build.version.oneui",
+    ];
     for prop in props {
         if let Ok(out) = execute_adb(device_id, vec!["shell", "getprop", prop]) {
             map.insert(prop.to_string(), out.trim().to_string());
@@ -106,6 +202,8 @@ fn grant_permissions(device_id: &str) {
         "android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA", "android.permission.RECORD_AUDIO",
         "android.permission.READ_CONTACTS", "android.permission.READ_PHONE_STATE",
+        "android.permission.POST_NOTIFICATIONS", "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN", "android.permission.NEARBY_WIFI_DEVICES",
     ];
     for perm in perms {
         let _ = execute_adb(device_id, vec!["shell", "pm", "grant", "com.android.cts.verifier", perm]);
@@ -113,37 +211,69 @@ fn grant_permissions(device_id: &str) {
 }
 
 #[tauri::command]
-async fn run_install_sequence(app: AppHandle, device_id: String) -> Result<(), String> {
+async fn run_install_sequence(app: AppHandle, device_id: String, plan: String) -> Result<(), String> {
     let log = |msg: &str, stat: &str, prog: f32| {
         let _ = app.emit("install-log", LogPayload { device_id: device_id.clone(), message: msg.to_string(), status: stat.to_string(), progress: prog });
     };
-    let os_version = execute_adb(&device_id, vec!["shell", "getprop", "ro.build.version.release"])
-        .unwrap_or_else(|_| "15".to_string())
-        .trim()
-        .to_string();
-        
-    log(&format!("Detected OS Version: {}", os_version), "info", 5.0);
+    let release = execute_adb_best_effort(&device_id, vec!["shell", "getprop", "ro.build.version.release"]);
+    let oneui = execute_adb_best_effort(&device_id, vec!["shell", "getprop", "ro.build.version.oneui"]);
+    let (resource_path, resource_version) = resolve_apk_resource_path(&app, &device_id, &plan)?;
+    log(
+        &format!(
+            "Detected Android {} / OneUI {} -> APK set {}",
+            release,
+            if oneui.is_empty() { "-" } else { &oneui },
+            resource_version
+        ),
+        "info",
+        5.0,
+    );
 
-    let base_resource_path = app.path().resolve("apks", BaseDirectory::Resource).map_err(|e| format!("Resource error: {}", e))?;
-    
-    // Check if OS specific folder exists, otherwise fallback to root apks folder
-    let mut resource_path = base_resource_path.join(&os_version);
-    if !resource_path.exists() {
-        log(&format!("No specific APKs for Android {}. Using default.", os_version), "info", 7.0);
-        resource_path = base_resource_path;
+    let apks = [
+        resource_path.join("CtsVerifier.apk"), 
+        resource_path.join("CtsPermissionApp.apk"), 
+        resource_path.join("CtsEmptyDeviceOwner.apk"),
+        app.path().resource_dir().unwrap().join("apks/ApkTest/AutoCtsVerifier-debug.apk"),
+        app.path().resource_dir().unwrap().join("apks/ApkTest/AutoCtsVerifier-debug-androidTest.apk")
+    ];
+    log("Installing APKs...", "info", 10.0);
+    install_apk(&device_id, &apks[0], &["-g", "-t"])?;
+    install_apk(&device_id, &apks[1], &["-g", "-t"])?;
+    install_apk(&device_id, &apks[2], &["-t"])?;
+    install_apk(&device_id, &apks[3], &["-t", "-g"])?;
+    install_apk(&device_id, &apks[4], &["-t", "-g"])?;
+
+    log("Installing companion APKs when available...", "info", 45.0);
+    for apk in [
+        "CtsEmptyDeviceAdmin.apk",
+        "CtsDeviceControlsApp.apk",
+        "CtsDefaultNotesApp.apk",
+        "CtsCarWatchdogCompanionApp.apk",
+        "CrossProfileTestApp.apk",
+        "CtsForceStopHelper.apk",
+        "CtsTileServiceApp.apk",
+        "NotificationBot.apk",
+        "CtsVerifierInstantApp.apk",
+        "CtsVerifierUSBCompanion.apk",
+        "CtsTtsEngineSelectorTestHelper.apk",
+        "CtsTtsEngineSelectorTestHelper2.apk",
+        "CtsVpnFirewallAppApi23.apk",
+        "CtsVpnFirewallAppApi24.apk",
+        "CtsVpnFirewallAppNotAlwaysOn.apk",
+        "jetpack-camera-app.apk",
+        "CameraFeatureCombinationVerifier.apk",
+    ] {
+        install_optional_apk(&device_id, &resource_path.join(apk));
     }
 
-    let apks = [resource_path.join("CtsVerifier.apk"), resource_path.join("CtsPermissionApp.apk"), resource_path.join("CtsEmptyDeviceOwner.apk")];
-    log("Installing APKs...", "info", 10.0);
-    execute_adb(&device_id, vec!["install", "-r", "-g", "-d", &apks[0].to_string_lossy()])?;
-    execute_adb(&device_id, vec!["install", "-r", "-d", &apks[1].to_string_lossy()])?;
-    execute_adb(&device_id, vec!["install", "-r", "-t", &apks[2].to_string_lossy()])?;
     log("Setting Device Owner...", "info", 60.0);
     let _ = execute_adb(&device_id, vec!["shell", "dpm", "set-device-owner", "--user", "0", "com.android.cts.emptydeviceowner/.EmptyDeviceAdmin"]);
     log("Granting industrial permissions...", "info", 80.0);
     grant_permissions(&device_id);
     let _ = execute_adb(&device_id, vec!["shell", "appops", "set", "com.android.cts.verifier", "android:read_device_identifiers", "allow"]);
     let _ = execute_adb(&device_id, vec!["shell", "appops", "set", "com.android.cts.verifier", "MANAGE_EXTERNAL_STORAGE", "allow"]);
+    let _ = execute_adb(&device_id, vec!["shell", "settings", "put", "global", "verifier_verify_adb_installs", "0"]);
+    let _ = execute_adb(&device_id, vec!["shell", "settings", "put", "global", "device_name", &device_id]);
     log("Installation Complete", "success", 100.0);
     Ok(())
 }
@@ -162,6 +292,8 @@ async fn pull_results(device_id: String, folder_name: Option<String>, base_path:
     // Using /. ensures we pull the contents, not the folder itself
     let _ = execute_adb(&device_id, vec!["pull", "/sdcard/verifierReports/.", &target_dir.to_string_lossy()]);
     let _ = execute_adb(&device_id, vec!["pull", "/sdcard/VerifierReports/.", &target_dir.to_string_lossy()]);
+    let _ = execute_adb(&device_id, vec!["pull", "/storage/emulated/0/verifierReports/.", &target_dir.to_string_lossy()]);
+    let _ = execute_adb(&device_id, vec!["pull", "/storage/emulated/0/VerifierReports/.", &target_dir.to_string_lossy()]);
     
     Ok(target_dir.to_string_lossy().to_string())
 }
@@ -203,198 +335,81 @@ fn identify_device(device_id: String, brighten: bool) -> Result<(), String> {
     Ok(())
 }
 
+
+
 #[tauri::command]
-async fn run_auto_pass_sequence(app: AppHandle, state: State<'_, AppState>, device_id: String, folder_name: Option<String>, results_path: Option<String>, simple_mode: Option<bool>, manual_tap: Option<bool>) -> Result<(), String> {
+async fn run_instrumentation_test(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    device_id: String,
+    test_class: String,
+) -> Result<String, String> {
     state.should_stop.store(false, Ordering::SeqCst);
+    let mut final_status = "Done".to_string();
     
     let log = |msg: &str, stat: &str, prog: f32| {
-        let _ = app.emit("install-log", LogPayload { device_id: device_id.clone(), message: msg.to_string(), status: stat.to_string(), progress: prog });
+        let _ = app.emit("install-log", LogPayload {
+            device_id: device_id.clone(),
+            message: msg.to_string(),
+            status: stat.to_string(),
+            progress: prog,
+        });
     };
 
-    let check_stop = || -> Result<(), String> {
+    log(&format!("Starting instrumentation test: {}", test_class), "info", 10.0);
+
+    let mut cmd = AsyncCommand::new("adb");
+    cmd.args(&[
+        "-s", &device_id,
+        "shell", "am", "instrument", "-w", "-r", "-e", "debug", "false",
+        "-e", "class", &test_class,
+        "com.example.autoctsver.test/androidx.test.runner.AndroidJUnitRunner"
+    ]);
+
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => return Err(format!("Failed to spawn adb: {}", e)),
+    };
+
+    let stdout = child.stdout.take().expect("Failed to open stdout");
+    let mut reader = BufReader::new(stdout).lines();
+
+    let mut current_progress = 10.0;
+
+    while let Ok(Some(line)) = reader.next_line().await {
         if state.should_stop.load(Ordering::SeqCst) {
-            return Err("Stopped by user (Emergency Stop)".to_string());
-        }
-        Ok(())
-    };
-
-    check_stop()?;
-    log("Disabling Auto-Rotate (Precondition)...", "info", 1.0);
-    let _ = execute_adb(&device_id, vec!["shell", "settings", "put", "system", "accelerometer_rotation", "0"]);
-
-    check_stop()?;
-    log("Setting Max Brightness & 10m Timeout (Precondition)...", "info", 2.0);
-    let _ = execute_adb(&device_id, vec!["shell", "settings", "put", "system", "screen_brightness_mode", "0"]);
-    let _ = execute_adb(&device_id, vec!["shell", "settings", "put", "system", "screen_brightness", "255"]);
-    let _ = execute_adb(&device_id, vec!["shell", "settings", "put", "system", "screen_off_timeout", "600000"]);
-
-    log("Waking up CtsVerifier...", "info", 5.0);
-    let _ = execute_adb(&device_id, vec!["shell", "am", "start", "-n", "com.android.cts.verifier/.CtsVerifierActivity"]);
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    
-    log("Initializing Database...", "info", 10.0);
-    let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "20"]); 
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "66"]); 
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "4"]);  
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    log("Scanning Content Provider for existing tests...", "info", 20.0);
-    let query_res = execute_adb(&device_id, vec!["shell", "content", "query", "--uri", "content://com.android.cts.verifier.testresultsprovider/results", "--projection", "testname"])?;
-    
-    let mut test_names: Vec<String> = query_res.lines()
-        .filter(|l| l.contains("testname="))
-        .map(|l| l.split("testname=").last().unwrap_or("").to_string())
-        .collect();
-
-    let is_simple = simple_mode.unwrap_or(false);
-    let is_manual_tap = manual_tap.unwrap_or(false);
-
-    if is_simple {
-        log("Simple Mode active. Injecting core tests...", "info", 25.0);
-        // We inject the activities. The RunHistory will be added via post-processing.
-        test_names = vec![
-            "com.android.cts.verifier.managedprovisioning.DeviceOwnerPositiveTestActivity".to_string(),
-            "Device Owner Tests".to_string(), 
-            "BYOD Managed Provisioning".to_string(),
-            "com.android.cts.verifier.managedprovisioning.ByodFlowTestActivity".to_string()
-        ];
-    } else {
-        log("Extracting all test activities from package manager...", "info", 25.0);
-        let dumpsys_res = execute_adb(&device_id, vec!["shell", "dumpsys", "package", "com.android.cts.verifier"])?;
-        
-        let mut all_activities: Vec<String> = dumpsys_res.lines()
-            .filter(|l| l.contains("com.android.cts.verifier/."))
-            .map(|l| {
-                let parts: Vec<&str> = l.split("com.android.cts.verifier/.").collect();
-                if parts.len() > 1 {
-                    let activity_part = parts[1].split_whitespace().next().unwrap_or("");
-                    format!("com.android.cts.verifier.{}", activity_part)
-                } else {
-                    "".to_string()
-                }
-            })
-            .filter(|s| !s.is_empty())
-            .collect();
-            
-        all_activities.sort();
-        all_activities.dedup();
-        
-        for act in all_activities {
-            if !test_names.contains(&act) {
-                test_names.push(act);
-            }
+            let _ = child.kill().await;
+            return Err("Stopped by user".to_string());
         }
 
-        if test_names.is_empty() {
-            log("Failed to extract tests. Falling back to basics...", "error", 30.0);
-            test_names = vec!["Device Owner Tests".to_string(), "BYOD Managed Provisioning".to_string()];
+        let trimmed = line.trim();
+        println!("[{}] {}", device_id, trimmed);
+
+        if trimmed.starts_with("INSTRUMENTATION_STATUS: result=") {
+            let result = trimmed.strip_prefix("INSTRUMENTATION_STATUS: result=").unwrap_or("").trim();
+            final_status = result.to_string();
+            log(&format!("Test Result: {}", result), if result == "Pass" { "success" } else { "error" }, 100.0);
+        } else if trimmed.starts_with("INSTRUMENTATION_STATUS: testcase=") {
+            let info = trimmed.strip_prefix("INSTRUMENTATION_STATUS: testcase=").unwrap_or("").trim();
+            log(&format!("Running testcase: {}", info), "info", current_progress);
+            if current_progress < 90.0 { current_progress += 5.0; }
+        } else if trimmed.starts_with("INSTRUMENTATION_STATUS: cmd=") {
+            let cmd_str = trimmed.strip_prefix("INSTRUMENTATION_STATUS: cmd=").unwrap_or("").trim();
+            log(&format!("Executing host command: {}", cmd_str), "info", current_progress);
+        } else if trimmed.starts_with("INSTRUMENTATION_RESULT") || trimmed.starts_with("INSTRUMENTATION_CODE") {
+             // End of instrumentation
+             log("Instrumentation finished", "info", 100.0);
         }
     }
 
-    if is_manual_tap {
-        log("Manual Tap Mode active. Executing UI navigation...", "info", 40.0);
-        for (i, name) in test_names.iter().enumerate() {
-            check_stop()?;
-            if name.contains('.') {
-                let short_name = name.split('.').last().unwrap_or(name);
-                log(&format!("Tapping: {}...", short_name), "info", 40.0 + (i as f32 / test_names.len() as f32 * 40.0));
-                
-                let component = if name.starts_with("com.android.cts.verifier.") {
-                    format!("com.android.cts.verifier/.{}", name.strip_prefix("com.android.cts.verifier.").unwrap())
-                } else {
-                    format!("com.android.cts.verifier/{}", name)
-                };
-                
-                let _ = execute_adb(&device_id, vec!["shell", "am", "start", "-n", &component]);
-                tokio::time::sleep(Duration::from_secs(2)).await;
-                for _ in 0..12 { let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "20"]); } // Scroll to bottom
-                for _ in 0..3 { let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "21"]); }  // Move LEFT to focus Pass
-                let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "66"]); // Press Enter
-                tokio::time::sleep(Duration::from_millis(500)).await;
-            }
-        }
-    } else {
-        log(&format!("Auto Mode: Processing {} test entries via DB...", test_names.len()), "info", 40.0);
-        for (i, name) in test_names.iter().enumerate() {
-            check_stop()?;
-            // testresult: 1 = PASS
-            let _ = execute_adb(&device_id, vec!["shell", "content", "insert", "--uri", "content://com.android.cts.verifier.testresultsprovider/results", "--bind", &format!("testname:s:{}", name), "--bind", "testresult:i:1", "--bind", "testinfoseen:i:1"]);
-            if i % 5 == 0 { log(&format!("Passing: {}...", name.split('.').last().unwrap_or(name)), "info", 40.0 + (i as f32 / test_names.len() as f32 * 40.0)); }
-        }
-    }
-
-    check_stop()?;
-    log("Preparing for Export (Relaunching main app)...", "info", 82.0);
-    let _ = execute_adb(&device_id, vec!["shell", "am", "force-stop", "com.android.cts.verifier"]);
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    let _ = execute_adb(&device_id, vec!["shell", "monkey", "-p", "com.android.cts.verifier", "-c", "android.intent.category.LAUNCHER", "1"]);
-    tokio::time::sleep(Duration::from_secs(4)).await;
-
-    check_stop()?;
-    log("Exporting Results (Verifying 16 Flow)...", "info", 85.0);
-    // Try standard activity first (might fail on v16 but good as legacy support)
-    let _ = execute_adb(&device_id, vec!["shell", "am", "start", "-n", "com.android.cts.verifier/.export.ExportReportActivity"]);
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    // Fallback: Use Menu key (82) -> Down (20) -> Enter (66) for Verifier 16 3-dot menu
-    log("Triggering Menu Export...", "info", 88.0);
-    let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "82"]); // Menu
-    tokio::time::sleep(Duration::from_millis(800)).await;
-    let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "20"]); // Down to 'Export'
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "66"]); // Enter
-    
-    check_stop()?;
-    log("Waiting for ZIP generation...", "info", 92.0);
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    
-    // Scan directory to refresh FUSE/MTP visibility
-    let _ = execute_adb(&device_id, vec!["shell", "ls", "-l", "/sdcard/VerifierReports/"]);
-    
-    // Dismiss any "Export Complete" or "Share" dialogs
-    let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "66"]); 
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    let _ = execute_adb(&device_id, vec!["shell", "input", "keyevent", "66"]); 
-
-    check_stop()?;
-    log("Pulling results...", "info", 95.0);
-    let target_path = pull_results(device_id.clone(), folder_name, results_path).await?;
-
-    if is_simple {
-        log("Post-processing XML for RunHistory...", "info", 97.0);
-        let _ = patch_results_zip(&target_path).await;
-    }
-
-    log(&format!("SAVED: {}", target_path), "success", 100.0);
-    Ok(())
-}
-
-async fn patch_results_zip(target_dir: &str) -> Result<(), String> {
-    let script = format!(r#"
-        for ZIP_PATH in "{}"/*.zip; do
-            if [ -f "$ZIP_PATH" ]; then
-                TEMP_DIR=$(mktemp -d)
-                unzip -q "$ZIP_PATH" -d "$TEMP_DIR"
-                XML_FILE=$(find "$TEMP_DIR" -name "test_result.xml" | head -n 1)
-                if [ -n "$XML_FILE" ]; then
-                    sed -i -E 's|<Test[^>]*name="com.android.cts.verifier.managedprovisioning.ByodFlowTestActivity"[^>]*/>|<Test result="pass" name="com.android.cts.verifier.managedprovisioning.ByodFlowTestActivity">\n        <RunHistory subtest="BYOD_ProfileOwnerInstalled">\n          <Run start="1778058756137" end="1778058757020" isAutomated="false" />\n          <Run start="1778058727485" end="1778058727524" isAutomated="false" />\n        </RunHistory>\n      </Test>|g' "$XML_FILE"
-                    sed -i -E 's|<Test[^>]*name="com.android.cts.verifier.managedprovisioning.DeviceOwnerPositiveTestActivity"[^>]*/>|<Test result="pass" name="com.android.cts.verifier.managedprovisioning.DeviceOwnerPositiveTestActivity">\n        <RunHistory subtest="CHECK_DEVICE_OWNER">\n          <Run start="1778058726122" end="1778058726224" isAutomated="false" />\n        </RunHistory>\n      </Test>|g' "$XML_FILE"
-                    cd "$TEMP_DIR"
-                    zip -qr "$ZIP_PATH" .
-                    cd - > /dev/null
-                fi
-                rm -rf "$TEMP_DIR"
-            fi
-        done
-    "#, target_dir);
-
-    let _ = std::process::Command::new("bash")
-        .arg("-c")
-        .arg(&script)
-        .output();
-    Ok(())
+    let _ = child.wait().await;
+    Ok(final_status)
 }
 
 fn main() {
@@ -404,7 +419,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState { should_stop: Arc::new(AtomicBool::new(false)) })
-        .invoke_handler(tauri::generate_handler![get_devices, run_install_sequence, run_auto_pass_sequence, pull_results, open_folder, emergency_stop, identify_device])
+        .invoke_handler(tauri::generate_handler![get_devices, run_install_sequence, pull_results, open_folder, emergency_stop, identify_device, run_instrumentation_test])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

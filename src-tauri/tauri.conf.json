@@ -11,9 +11,9 @@
     "windows": [
       {
         "title": "CTS Verifier Installer",
-        "width": 1000,
+        "width": 1800,
         "height": 720,
-        "minWidth": 800,
+        "minWidth": 1800,
         "minHeight": 500,
         "resizable": true,
         "center": true,

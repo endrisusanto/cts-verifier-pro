@@ -26,26 +26,106 @@
     </div>
     
     <div class="controls">
-      <label class="auto-pass-container">
-        <div class="switch">
-          <input type="checkbox" id="auto-pass-checkbox">
-          <span class="slider"></span>
-        </div>
-        <span class="auto-pass-label">Auto-Pass</span>
-      </label>
-      <button id="toggle-all" class="btn btn-ghost">Select</button>
-      <button id="pass-selected" class="btn btn-ghost" style="color: #ffb300; border-color: rgba(255,179,0,0.2);" disabled>Pass Selected</button>
-      <button id="emergency-stop" class="btn btn-ghost" style="color: #ff4d4d; border-color: rgba(255,77,77,0.2); display: none;">Stop</button>
-      <button id="refresh-btn" class="btn btn-ghost">Refresh</button>
       <button id="settings-btn" class="btn btn-ghost" title="Settings">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
-      <button id="install-selected" class="btn btn-primary" disabled>Install Selected</button>
     </div>
   </header>
 
-  <main id="device-list">
-    <!-- Device cards injected here -->
+  <main class="app-layout">
+    <!-- Left Pane: Devices -->
+    <aside class="sidebar-devices">
+      <div class="sidebar-header">
+        <h3>Devices</h3>
+        <div style="display: flex; gap: 4px;">
+          <button id="toggle-all" class="btn btn-ghost" style="padding: 2px 6px; font-size: 0.6rem;">Select All</button>
+          <button id="refresh-btn" class="btn btn-ghost" style="padding: 2px 6px; font-size: 0.6rem;">Refresh</button>
+        </div>
+      </div>
+      <div id="device-list" class="device-list-vertical">
+        <!-- Device cards injected here -->
+      </div>
+    </aside>
+
+    <!-- Center Pane: Test Runner -->
+    <section class="test-runner-pane">
+      <div class="toolbar">
+        <div style="display: flex; gap: 10px; align-items: center; border-right: 1px solid var(--border); padding-right: 15px;">
+          <span style="color: #888; font-size: 0.75rem; text-transform: uppercase;">Task:</span>
+          <select id="task-selector" class="btn btn-ghost" style="padding: 4px 10px; font-size: 0.8rem; border-color: var(--border);">
+            <option value="cts-verifier">CTS-Verifier</option>
+            <option value="cts-verifier-normal">CTS-Verifier Normal</option>
+            <option value="wts-verifier">WTS-Verifier</option>
+          </select>
+
+          <label class="cb-container-text" style="margin-left: 10px;">
+            <input type="checkbox" id="skip-preconditions"> <span class="checkmark-box"></span> Skip Preconditions
+          </label>
+        </div>
+
+        <div class="breadcrumb-nav">
+          <button id="get-testcases-btn" class="btn">Get Testcases</button>
+          <button id="run-real-test" class="btn" disabled>Run Selected</button>
+          <button id="get-results-btn" class="btn" disabled>Get Results</button>
+        </div>
+        <button id="emergency-stop" class="btn btn-ghost" style="color: #ff4d4d; border-color: rgba(255,77,77,0.2); display: none; margin-left: 10px;">Stop</button>
+        
+        <select id="retry-count" class="btn btn-ghost" style="padding: 2px 8px; font-size: 0.7rem;">
+          <option value="0">Retry: 0</option>
+          <option value="1">Retry: 1</option>
+          <option value="2">Retry: 2</option>
+          <option value="3" selected>Retry: 3</option>
+        </select>
+        
+        <div class="filters">
+          <label class="cb-container-text">
+            <input type="checkbox" id="filter-all"> <span class="checkmark-box"></span> All
+          </label>
+          <label class="cb-container-text">
+            <input type="checkbox" id="filter-fail"> <span class="checkmark-box"></span> Fail/Executing
+          </label>
+        </div>
+      </div>
+      
+      <div class="table-container">
+        <table id="checklist-table">
+          <thead>
+            <tr>
+              <th width="10%">Select</th>
+              <th width="50%">Testcase</th>
+              <th width="20%">Result</th>
+              <th width="20%">Time</th>
+            </tr>
+          </thead>
+          <tbody id="checklist-body">
+            <!-- Mock rows will be injected by JS for now -->
+            <tr><td colspan="4" style="text-align: center; color: #666; padding: 40px;">Select a device and click "Get Test case"</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Right Pane: Summary & Logs -->
+    <aside class="sidebar-logs">
+      <div class="summary-panel">
+        <h3 class="panel-title">Summarize</h3>
+        <div class="summary-grid">
+          <div class="summary-item"><span class="label">Executed:</span> <span id="summary-executed" class="val">0</span></div>
+          <div class="summary-item"><span class="label">Started, not have result:</span> <span id="summary-started" class="val">0</span></div>
+          <div class="summary-item"><span class="label">Pass:</span> <span id="summary-pass" class="val success">0</span></div>
+          <div class="summary-item"><span class="label">Fail:</span> <span id="summary-fail" class="val error">0</span></div>
+          <div class="summary-item"><span class="label">Total runtime:</span> <span id="summary-time" class="val">00:00:00</span></div>
+        </div>
+      </div>
+      
+      <div class="console-header">
+        <span>Running Log</span>
+        <button id="clear-log-btn" class="btn-text" style="color: var(--blue); font-size: 0.6rem; background: transparent; border: none; cursor: pointer;">[ Clear Log ]</button>
+      </div>
+      <div id="log-output" class="log-panel">
+        <div class="log-info">System initialized. Waiting for devices...</div>
+      </div>
+    </aside>
   </main>
 
   <!-- Settings Modal -->
@@ -63,28 +143,6 @@
             <button id="browse-path-btn" class="btn btn-ghost" style="padding: 0 12px; font-size: 0.7rem;">Browse</button>
           </div>
         </div>
-
-        <div class="setting-item" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
-          <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #fff;">
-            <span>Simple Mode (Basic Tests Only)</span>
-            <div class="switch">
-              <input type="checkbox" id="simple-mode-setting">
-              <span class="slider"></span>
-            </div>
-          </label>
-          <div style="font-size: 0.65rem; color: #888; margin-top: 4px;">Only pass BYOD Managed Provisioning & Device Owner Tests instead of all 100+ tests.</div>
-        </div>
-
-        <div class="setting-item" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
-          <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #fff;">
-            <span>Execution Method: Manual (Tap Tap)</span>
-            <div class="switch">
-              <input type="checkbox" id="manual-tap-setting">
-              <span class="slider"></span>
-            </div>
-          </label>
-          <div style="font-size: 0.65rem; color: #888; margin-top: 4px;">If enabled, uses UI Navigation (Tap Tap) instead of Database Injection.</div>
-        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="document.getElementById('settings-modal').style.display='none'">Cancel</button>
@@ -93,19 +151,9 @@
     </div>
   </div>
 
-  <footer class="console" id="resizable-console">
+
     <div id="console-resizer" class="resizer"></div>
-    <div class="console-header">
-      <div style="display: flex; gap: 12px; align-items: center;">
-        <span>Output Console</span>
-        <button id="clear-log-btn" class="btn-text" style="color: var(--blue); font-size: 0.6rem; background: transparent; border: none; cursor: pointer; text-transform: uppercase;">[ Clear Log ]</button>
-      </div>
-      <span id="app-status">Standby</span>
-    </div>
-    <div id="log-output">
-      <div class="log-info">System initialized. Waiting for devices...</div>
-    </div>
-  </footer>
+
 
   <!-- Professional Error Modal -->
   <div id="error-modal" class="modal-overlay">
@@ -122,6 +170,11 @@
       </div>
     </div>
   </div>
+
+  <footer style="background: #111; border-top: 1px solid var(--border); padding: 4px 15px; display: flex; justify-content: space-between; align-items: center; font-size: 0.65rem; color: #666;">
+    <div>&copy; 2026 Android CTS Automation</div>
+    <div id="app-status">Standby</div>
+  </footer>
 
   <script src="main.js"></script>
 </body>
