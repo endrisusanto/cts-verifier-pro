@@ -83,12 +83,12 @@ mod tests {
     }
 }
 
-fn resolve_apk_resource_path(app: &AppHandle, device_id: &str, plan: &str) -> Result<(PathBuf, String), String> {
+fn resolve_apk_resource_path(app: &AppHandle, device_id: &str, _plan: &str) -> Result<(PathBuf, String), String> {
     let release = execute_adb_best_effort(device_id, vec!["shell", "getprop", "ro.build.version.release"]);
     let oneui = execute_adb_best_effort(device_id, vec!["shell", "getprop", "ro.build.version.oneui"]);
     let normalized = normalize_android_resource_version(&release, &oneui);
     
-    let plan_folder = if plan.to_lowercase() == "normal" { "Normal" } else { "Full" };
+    let plan_folder = "Normal";
     let base_path = app.path().resolve(format!("apks/{}", plan_folder), BaseDirectory::Resource).map_err(|e| format!("Resource error: {}", e))?;
 
     let normalized_path = base_path.join(&normalized);
@@ -231,17 +231,17 @@ async fn run_install_sequence(app: AppHandle, device_id: String, plan: String) -
 
     let apks = [
         resource_path.join("CtsVerifier.apk"), 
-        resource_path.join("CtsPermissionApp.apk"), 
         resource_path.join("CtsEmptyDeviceOwner.apk"),
         app.path().resource_dir().unwrap().join("apks/ApkTest/AutoCtsVerifier-debug.apk"),
         app.path().resource_dir().unwrap().join("apks/ApkTest/AutoCtsVerifier-debug-androidTest.apk")
     ];
     log("Installing APKs...", "info", 10.0);
     install_apk(&device_id, &apks[0], &["-g", "-t"])?;
-    install_apk(&device_id, &apks[1], &["-g", "-t"])?;
-    install_apk(&device_id, &apks[2], &["-t"])?;
+    install_apk(&device_id, &apks[1], &["-t"])?;
+    install_apk(&device_id, &apks[2], &["-t", "-g"])?;
     install_apk(&device_id, &apks[3], &["-t", "-g"])?;
-    install_apk(&device_id, &apks[4], &["-t", "-g"])?;
+
+    install_optional_apk(&device_id, &resource_path.join("CtsPermissionApp.apk"));
 
     log("Installing companion APKs when available...", "info", 45.0);
     for apk in [

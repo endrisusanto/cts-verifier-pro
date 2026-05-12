@@ -37,7 +37,9 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "apks/**/*"
+      "apks/Normal/**/*",
+      "apks/ApkTest/AutoCtsVerifier-debug.apk",
+      "apks/ApkTest/AutoCtsVerifier-debug-androidTest.apk"
     ]
   }
 }

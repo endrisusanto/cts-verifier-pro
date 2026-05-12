@@ -99,14 +99,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const allTests = testCaseAvailable.CtsVerModule || [];
     
     let filteredTests = [];
-    if (task === "cts-verifier-normal") {
-       filteredTests = allTests.filter(t => t === "BYODManagedProvisioningNormal" || t === "DeviceOwnerTestsNormal");
-    } else if (task === "cts-verifier") {
-       filteredTests = allTests.filter(t => t !== "BYODManagedProvisioningNormal" && t !== "DeviceOwnerTestsNormal");
-    } else if (task === "wts-verifier") {
-       // WTS specific logic later
-       filteredTests = allTests.filter(t => t.startsWith("Wts")); 
-    }
+    filteredTests = allTests.filter(t => t === "BYODManagedProvisioningNormal" || t === "DeviceOwnerTestsNormal");
 
     // Map to activity using TestCaseToActivity.json
     // The keys in TestCaseToActivity often have spaces (e.g. "Device Owner Tests") while ListTestCaseAvailable has no spaces.
@@ -367,7 +360,7 @@ window.addEventListener("DOMContentLoaded", () => {
     setLoadingState(true, "Running Real Tests...");
     appendLog("SYSTEM", `Starting real instrumentation on ${selectedIds.length} devices for ${selectedTests.length} tests...`, "info");
 
-    const planStr = taskSelector.value === "cts-verifier-normal" ? "normal" : "full";
+    const planStr = "normal";
 
     const promises = selectedIds.map(async (id) => {
       // 1. Run Preconditions if not skipped
