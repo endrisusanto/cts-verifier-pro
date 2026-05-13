@@ -5,14 +5,14 @@ CTS Verifier Pro adalah aplikasi desktop berbasis Tauri untuk otomasi CTS Verifi
 ## Fitur
 
 - Menjalankan flow CTS Verifier ke banyak device sekaligus.
-- Resource APK dipisah dari installer agar update resource tidak perlu rebuild app.
+- Resource APK dipisah dari installer dan tidak disimpan di GitHub repository/release karena batas ukuran file.
 - Paket rilis otomatis untuk Linux `deb/rpm` dan Windows `exe`.
 - GitHub Release otomatis saat push tag `v*`.
 - GitHub Pages untuk halaman download dan panduan instalasi singkat.
 
 ## Struktur Resource
 
-Installer tidak membundel APK resource. Resource harus dipasang terpisah dalam folder `resources/` atau diarahkan lewat environment variable `CTS_VERIFIER_RESOURCE_DIR`.
+Installer tidak membundel APK resource. Resource harus dicopy manual ke folder `resources/` atau diarahkan lewat environment variable `CTS_VERIFIER_RESOURCE_DIR`.
 
 ```text
 resources/
@@ -50,7 +50,7 @@ npm run tauri dev
 
 ### Linux
 
-Menghasilkan installer `deb`, `rpm`, folder `releases/resources`, dan `releases/cts-verifier-resources.zip`.
+Menghasilkan installer `deb` dan `rpm`.
 
 ```bash
 npm run build:linux
@@ -58,7 +58,7 @@ npm run build:linux
 
 ### Windows
 
-Menghasilkan installer `exe` NSIS, folder `releases/resources`, dan `releases/cts-verifier-resources.zip`.
+Menghasilkan installer `exe` NSIS.
 
 ```bash
 npm run build:windows
@@ -97,8 +97,8 @@ sudo dnf install ./cts-verifier-pro-*.rpm
 
 ### Pasang Resource Terpisah
 
-1. Unduh `cts-verifier-resources.zip`.
-2. Ekstrak menjadi folder `resources/`.
+1. Siapkan folder resource dari shared storage / backup internal tim.
+2. Copy manual menjadi folder `resources/`.
 3. Letakkan folder `resources/` di samping binary/aplikasi, atau set:
 
 ```bash
@@ -112,7 +112,6 @@ Workflow release ada di `.github/workflows/release.yml`. Saat tag `v*` di-push, 
 - build `deb`
 - build `rpm`
 - build `exe`
-- membuat `cts-verifier-resources.zip`
 - membuat draft GitHub Release
 
 Langkah rilis:
@@ -129,8 +128,18 @@ Setelah workflow selesai:
 1. Buka tab Actions.
 2. Pastikan job `Release` sukses.
 3. Buka halaman draft release.
-4. Verifikasi asset installer dan `cts-verifier-resources.zip`.
+4. Verifikasi asset installer.
 5. Publish release.
+
+## Catatan Resource Besar
+
+File APK resource sengaja di-`gitignore` dan tidak ikut release asset GitHub karena GitHub membatasi file besar sekitar `100 MB` per file.
+
+Alur operasionalnya:
+
+- installer dirilis lewat GitHub Release
+- resource disimpan di shared storage / folder internal terpisah
+- setelah install, operator copy manual folder `resources/`
 
 ## GitHub Pages
 

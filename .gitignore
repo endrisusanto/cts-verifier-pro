@@ -33,3 +33,5 @@ results/
 results.db
 window_dump*.xml
 test_pull/
+resources/
+src-tauri/apks/

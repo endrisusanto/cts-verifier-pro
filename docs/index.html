@@ -163,11 +163,11 @@
 <body>
   <div class="container">
     <section class="hero">
-      <span class="pill">Separate installer + resources</span>
+      <span class="pill">Installer release + manual resource copy</span>
       <h1>CTS Verifier Pro</h1>
       <p>
-        Desktop automation tool untuk CTS Verifier multi-device. Installer dirilis terpisah dari resource APK,
-        jadi update resource bisa dilakukan tanpa rebuild aplikasi.
+        Desktop automation tool untuk CTS Verifier multi-device. Installer dirilis lewat GitHub,
+        sementara resource APK dicopy manual dari storage internal agar tidak kena batas ukuran file GitHub.
       </p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="https://github.com/endrisusanto/cts-verifier-pro/releases/latest">Open Latest Release</a>
@@ -190,7 +190,7 @@
       </article>
       <article class="card">
         <h2>Shared Resources</h2>
-        <p>Unduh <span class="mono">cts-verifier-resources.zip</span> untuk semua platform.</p>
+        <p>Resource APK tidak di-host di GitHub Release; copy manual dari storage internal tim.</p>
       </article>
     </section>
 
@@ -198,9 +198,9 @@
       <h3>Install Steps</h3>
       <ol>
         <li>Unduh installer sesuai OS dari release terbaru.</li>
-        <li>Unduh juga <span class="mono">cts-verifier-resources.zip</span>.</li>
+        <li>Siapkan folder resource dari storage internal tim.</li>
         <li>Install aplikasinya.</li>
-        <li>Ekstrak file zip menjadi folder <span class="mono">resources/</span>.</li>
+        <li>Copy manual menjadi folder <span class="mono">resources/</span>.</li>
         <li>Letakkan folder <span class="mono">resources/</span> di samping binary aplikasi, atau gunakan environment variable.</li>
       </ol>
       <pre>CTS_VERIFIER_RESOURCE_DIR=/path/to/resources</pre>
@@ -228,7 +228,7 @@ git tag -a v1.4.0 -m "Release v1.4.0"
 git push origin v1.4.0</pre>
       <ul>
         <li>Workflow build asset <span class="mono">deb</span>, <span class="mono">rpm</span>, dan <span class="mono">exe</span>.</li>
-        <li>Workflow juga membuat <span class="mono">cts-verifier-resources.zip</span>.</li>
+        <li>Workflow hanya build installer; resource dikelola terpisah di luar GitHub.</li>
         <li>Hasilnya dikirim ke draft GitHub Release untuk direview sebelum publish.</li>
       </ul>
     </section>
