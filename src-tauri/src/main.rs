@@ -594,9 +594,12 @@ fn grant_permissions(device_id: &str) {
 #[tauri::command]
 async fn run_install_sequence(
     app: AppHandle,
+    state: tauri::State<'_, AppState>,
     device_id: String,
     plan: String,
 ) -> Result<(), String> {
+    state.should_stop.store(false, Ordering::SeqCst);
+
     let log = |msg: &str, stat: &str, prog: f32| {
         let _ = app.emit(
             "install-log",
@@ -608,6 +611,16 @@ async fn run_install_sequence(
             },
         );
     };
+
+    let check_stop = || {
+        if state.should_stop.load(Ordering::SeqCst) {
+            log("Emergency Stop triggered. Cleaning up...", "error", 90.0);
+            cleanup_installed_packages(&device_id);
+            return Err("Stopped by user".to_string());
+        }
+        Ok(())
+    };
+
     let release = execute_adb_best_effort(
         &device_id,
         vec!["shell", "getprop", "ro.build.version.release"],
@@ -628,8 +641,12 @@ async fn run_install_sequence(
         5.0,
     );
 
+    check_stop()?;
+
     log("Cleaning previous CTS/automation APKs...", "info", 7.0);
     cleanup_installed_packages(&device_id);
+
+    check_stop()?;
 
     let apks = [
         resource_path.join("CtsVerifier.apk"),
@@ -639,11 +656,16 @@ async fn run_install_sequence(
     ];
     log("Installing APKs...", "info", 10.0);
     install_apk(&device_id, &apks[0], &["-g", "-t"])?;
+    check_stop()?;
     install_apk(&device_id, &apks[1], &["-t"])?;
+    check_stop()?;
     install_apk(&device_id, &apks[2], &["-t", "-g"])?;
+    check_stop()?;
     install_apk(&device_id, &apks[3], &["-t", "-g"])?;
+    check_stop()?;
 
     install_optional_apk(&device_id, &resource_path.join("CtsPermissionApp.apk"));
+    check_stop()?;
 
     log("Installing companion APKs when available...", "info", 45.0);
     for apk in [
@@ -665,6 +687,9 @@ async fn run_install_sequence(
         "jetpack-camera-app.apk",
         "CameraFeatureCombinationVerifier.apk",
     ] {
+        if state.should_stop.load(Ordering::SeqCst) {
+            return check_stop();
+        }
         install_optional_apk(&device_id, &resource_path.join(apk));
     }
 
@@ -680,6 +705,8 @@ async fn run_install_sequence(
             "com.android.cts.emptydeviceowner/.EmptyDeviceAdmin",
         ],
     );
+    check_stop()?;
+
     log("Granting industrial permissions...", "info", 80.0);
     grant_permissions(&device_id);
     let _ = execute_adb(
@@ -1026,6 +1053,8 @@ async fn run_instrumentation_test(
     loop {
         if state.should_stop.load(Ordering::SeqCst) {
             let _ = child.kill().await;
+            log("Emergency Stop triggered. Cleaning up...", "error", 95.0);
+            cleanup_installed_packages(&device_id);
             return Err("Stopped by user".to_string());
         }
 
