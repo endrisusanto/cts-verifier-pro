@@ -76,7 +76,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Draft GitHub release
+    name: Create GitHub Release
     runs-on: ubuntu-22.04
     needs:
       - build-linux
@@ -93,29 +93,29 @@ jobs:
           cat > RELEASE_NOTES.md <<EOF
           ## CTS Verifier Pro ${TAG_NAME}
 
-          ### Assets
-          - Linux installer: \`.deb\`
-          - Linux installer: \`.rpm\`
-          - Windows installer: \`.exe\`
+          ### Installation Assets
+          * **Windows**: Download the \`.exe\` installer.
+          * **Linux**: Use \`.deb\` (Debian/Ubuntu) or \`.rpm\` (Fedora/CentOS).
 
-          ### Important
-          Installer dan resource dipisah.
-          Resource APK tidak diupload ke GitHub Release karena ukuran file besar.
-          Setelah install aplikasi, copy folder resource secara manual menjadi \`resources/\` di samping binary, atau set environment variable:
+          > [!IMPORTANT]
+          > **Resource APKs are NOT included in this release** due to their large size.
+          > 1. Download the resource APKs separately.
+          > 2. Place them in a \`resources/\` folder next to the installed application.
+          > 3. Alternatively, set the environment variable \`CTS_VERIFIER_RESOURCE_DIR\`.
 
-          \`\`\`bash
-          CTS_VERIFIER_RESOURCE_DIR=/path/to/resources
-          \`\`\`
-
-          Panduan detail ada di README dan GitHub Pages project.
+          ---
+          *Automated release triggered by tag ${TAG_NAME}*
           EOF
 
-      - name: Publish draft release
+      - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          name: "CTS Verifier Pro ${{ github.ref_name }}"
+          tag_name: ${{ github.ref }}
+          draft: false
           prerelease: false
           body_path: RELEASE_NOTES.md
+          generate_release_notes: true
           files: |
             dist/linux-bundles/**/*.deb
             dist/linux-bundles/**/*.rpm

@@ -793,10 +793,26 @@ fn open_folder(
     let target_dir = PathBuf::from(base).join(&name);
     let _ = std::fs::create_dir_all(&target_dir);
 
-    // We use xdg-open for Linux.
-    let _ = std::process::Command::new("xdg-open")
-        .arg(&target_dir)
-        .spawn();
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer")
+            .arg(&target_dir)
+            .spawn();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open")
+            .arg(&target_dir)
+            .spawn();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open")
+            .arg(&target_dir)
+            .spawn();
+    }
 
     Ok(())
 }
