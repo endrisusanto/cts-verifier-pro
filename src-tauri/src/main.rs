@@ -71,6 +71,63 @@ fn execute_adb_best_effort(device_id: &str, args: Vec<&str>) -> String {
         .to_string()
 }
 
+fn parse_bounds_center(xml: &str, text: &str) -> Option<(i32, i32)> {
+    let text_marker = format!("text=\"{}\"", text);
+    let desc_marker = format!("content-desc=\"{}\"", text);
+    let node_pos = xml
+        .find(&text_marker)
+        .or_else(|| xml.find(&desc_marker))?;
+    let bounds_pos = xml[node_pos..].find("bounds=\"")? + node_pos + "bounds=\"".len();
+    let bounds_end = xml[bounds_pos..].find('"')? + bounds_pos;
+    let bounds = &xml[bounds_pos..bounds_end];
+    let values: Vec<i32> = bounds
+        .split(|c| c == '[' || c == ']' || c == ',')
+        .filter_map(|value| value.trim().parse::<i32>().ok())
+        .collect();
+    if values.len() == 4 {
+        Some(((values[0] + values[2]) / 2, (values[1] + values[3]) / 2))
+    } else {
+        None
+    }
+}
+
+fn trigger_cts_verifier_export(device_id: &str) -> Result<(), String> {
+    let _ = execute_adb(device_id, vec!["shell", "input", "keyevent", "224"]);
+    let _ = execute_adb(
+        device_id,
+        vec![
+            "shell",
+            "am",
+            "start",
+            "-n",
+            "com.android.cts.verifier/.CtsVerifierActivity",
+        ],
+    )
+    .or_else(|_| {
+        execute_adb(
+            device_id,
+            vec!["shell", "monkey", "-p", "com.android.cts.verifier", "1"],
+        )
+    })?;
+    std::thread::sleep(Duration::from_millis(1200));
+
+    execute_adb(device_id, vec!["shell", "input", "keyevent", "82"])?;
+    std::thread::sleep(Duration::from_millis(600));
+
+    let dump_path = "/sdcard/cts_export_window.xml";
+    let _ = execute_adb(device_id, vec!["shell", "uiautomator", "dump", dump_path]);
+    let xml = execute_adb(device_id, vec!["shell", "cat", dump_path])?;
+    let (x, y) = parse_bounds_center(&xml, "Export")
+        .ok_or_else(|| "Could not find Export menu item in CTS Verifier UI".to_string())?;
+    execute_adb(
+        device_id,
+        vec!["shell", "input", "tap", &x.to_string(), &y.to_string()],
+    )?;
+    std::thread::sleep(Duration::from_millis(2500));
+    let _ = execute_adb(device_id, vec!["shell", "sync"]);
+    Ok(())
+}
+
 fn normalize_android_resource_version(release: &str, oneui: &str) -> String {
     let oneui_version = oneui.trim().parse::<u32>().unwrap_or(0);
     let release = release.trim();
@@ -768,43 +825,77 @@ async fn pull_results(
     let target_dir = PathBuf::from(base).join(&name);
     let _ = std::fs::create_dir_all(&target_dir);
 
+    let export_error = trigger_cts_verifier_export(&device_id).err();
+
     // Force sync filesystem on device to ensure ZIPs are flushed
     let _ = execute_adb(&device_id, vec!["shell", "sync"]);
 
-    // Pull contents of both possible folder names directly into target_dir
-    // Using /. ensures we pull the contents, not the folder itself
-    let _ = execute_adb(
+    // Pull contents of both possible folder names directly into target_dir.
+    // Using /. ensures we pull the contents, not the folder itself.
+    let mut candidates: Vec<String> = vec![
+        "/sdcard/verifierReports/.",
+        "/sdcard/VerifierReports/.",
+        "/storage/emulated/0/verifierReports/.",
+        "/storage/emulated/0/VerifierReports/.",
+        // Some devices/app builds keep reports under app-private external storage.
+        "/sdcard/Android/data/com.android.cts.verifier/files/VerifierReports/.",
+        "/sdcard/Android/data/com.android.cts.verifier/files/verifierReports/.",
+        "/storage/emulated/0/Android/data/com.android.cts.verifier/files/VerifierReports/.",
+        "/storage/emulated/0/Android/data/com.android.cts.verifier/files/verifierReports/.",
+        // Legacy automation app writes its exported results into its own app-private external storage.
+        "/sdcard/Android/data/com.example.autoctsver/files/.",
+        "/storage/emulated/0/Android/data/com.example.autoctsver/files/.",
+    ]
+    .into_iter()
+    .map(|s| s.to_string())
+    .collect();
+
+    // Best-effort auto-discovery: list any directory that looks like VerifierReports on sdcard.
+    let discovery = execute_adb_best_effort(
         &device_id,
         vec![
-            "pull",
-            "/sdcard/verifierReports/.",
-            &target_dir.to_string_lossy(),
+            "shell",
+            "sh",
+            "-c",
+            "ls -d /sdcard/*Verifier*Report* /sdcard/*verifier*report* 2>/dev/null | head -n 10",
         ],
     );
-    let _ = execute_adb(
-        &device_id,
-        vec![
-            "pull",
-            "/sdcard/VerifierReports/.",
-            &target_dir.to_string_lossy(),
-        ],
-    );
-    let _ = execute_adb(
-        &device_id,
-        vec![
-            "pull",
-            "/storage/emulated/0/verifierReports/.",
-            &target_dir.to_string_lossy(),
-        ],
-    );
-    let _ = execute_adb(
-        &device_id,
-        vec![
-            "pull",
-            "/storage/emulated/0/VerifierReports/.",
-            &target_dir.to_string_lossy(),
-        ],
-    );
+    for line in discovery.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        candidates.push(format!("{}/.", trimmed.trim_end_matches('/')));
+    }
+
+    let mut last_error: Option<String> = None;
+    for remote_path in candidates.iter() {
+        match execute_adb(
+            &device_id,
+            vec!["pull", remote_path.as_str(), &target_dir.to_string_lossy()],
+        ) {
+            Ok(_) => {}
+            Err(err) => {
+                // Many devices simply don't have one of the path variants; keep going.
+                last_error = Some(err);
+            }
+        }
+    }
+
+    // If nothing was pulled, surface a useful error instead of silently succeeding.
+    let pulled_anything = std::fs::read_dir(&target_dir)
+        .map(|mut it| it.next().is_some())
+        .unwrap_or(false);
+    if !pulled_anything {
+        let hint = "No CTS Verifier reports found on device. Try exporting results in CTS Verifier, or ensure storage permission/paths are accessible, then try again.";
+        if let Some(err) = export_error {
+            return Err(format!("{} Export automation error: {}", hint, err.trim()));
+        }
+        if let Some(err) = last_error {
+            return Err(format!("{} Last ADB error: {}", hint, err.trim()));
+        }
+        return Err(hint.to_string());
+    }
 
     Ok(target_dir.to_string_lossy().to_string())
 }

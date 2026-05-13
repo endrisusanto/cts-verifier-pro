@@ -547,6 +547,71 @@ input:checked ~ .auto-pass-label { color: #ffb300; }
   background: #0d0d0d;
 }
 
+.settings-modal {
+  max-width: 560px;
+}
+
+.settings-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-label {
+  display: block;
+  font-size: 0.65rem;
+  color: #888;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.settings-select,
+.settings-path-input {
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--border);
+  color: #fff;
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.settings-path-input {
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 0;
+}
+
+.settings-path-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.settings-browse-btn {
+  padding: 0 14px;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.setting-check {
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.setting-checkbox {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 #error-message {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem; color: #ccc;

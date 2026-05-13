@@ -50,20 +50,10 @@
     <!-- Center Pane: Test Runner -->
     <section class="test-runner-pane">
       <div class="toolbar">
-        <div style="display: flex; gap: 10px; align-items: center; border-right: 1px solid var(--border); padding-right: 15px;">
-          <span style="color: #888; font-size: 0.75rem; text-transform: uppercase;">Task:</span>
-          <select id="task-selector" class="btn btn-ghost" style="padding: 4px 10px; font-size: 0.8rem; border-color: var(--border);">
-            <option value="cts-verifier-normal">CTS-Verifier Normal</option>
-          </select>
-
-          <label class="cb-container-text" style="margin-left: 10px;">
-            <input type="checkbox" id="skip-preconditions"> <span class="checkmark-box"></span> Skip Preconditions
-          </label>
-        </div>
-
         <div class="action-buttons">
           <button id="get-testcases-btn" class="btn btn-action">Get Testcases</button>
           <button id="run-real-test" class="btn btn-action" disabled>Run Selected</button>
+          <button id="get-results-btn" class="btn btn-action" disabled>Get Results</button>
         </div>
         <button id="emergency-stop" class="btn btn-ghost" style="color: #ff4d4d; border-color: rgba(255,77,77,0.2); display: none; margin-left: 10px;">Stop</button>
         
@@ -114,17 +104,33 @@
 
   <!-- Settings Modal -->
   <div id="settings-modal" class="modal-overlay">
-    <div class="modal" style="border-color: var(--blue);">
+    <div class="modal settings-modal" style="border-color: var(--blue);">
       <div class="modal-header">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <h2>Application Settings</h2>
       </div>
       <div class="modal-body">
         <div class="setting-item">
-          <label style="display: block; font-size: 0.65rem; color: #888; text-transform: uppercase; margin-bottom: 8px;">Results Folder Path</label>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="results-path-input" readonly placeholder="Default: ./results" style="flex: 1; background: #000; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 0.7rem;">
-            <button id="browse-path-btn" class="btn btn-ghost" style="padding: 0 12px; font-size: 0.7rem;">Browse</button>
+          <label class="setting-label">Task</label>
+          <select id="task-selector" class="settings-select">
+            <option value="cts-verifier-normal">CTS-Verifier Normal</option>
+          </select>
+        </div>
+        <div class="setting-item setting-check">
+          <label class="cb-container-text setting-checkbox">
+            <input type="checkbox" id="skip-preconditions"> <span class="checkmark-box"></span> Skip Preconditions
+          </label>
+        </div>
+        <div class="setting-item setting-check">
+          <label class="cb-container-text setting-checkbox">
+            <input type="checkbox" id="cleanup-after-test"> <span class="checkmark-box"></span> Cleanup After Test
+          </label>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Results Folder Path</label>
+          <div class="settings-path-row">
+            <input type="text" id="results-path-input" readonly placeholder="Default: ./results" class="settings-path-input">
+            <button id="browse-path-btn" class="btn btn-ghost settings-browse-btn">Browse</button>
           </div>
         </div>
       </div>

@@ -16,7 +16,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const getTestcasesBtn = document.getElementById("get-testcases-btn");
   const taskSelector = document.getElementById("task-selector");
   const skipPreconditions = document.getElementById("skip-preconditions");
+  const cleanupAfterTest = document.getElementById("cleanup-after-test");
   const retryCount = document.getElementById("retry-count");
+  const getResultsBtn = document.getElementById("get-results-btn");
   const clearLogBtn = document.getElementById("clear-log-btn");
   const checklistsContainer = document.getElementById("checklists-container");
   const summaryExecuted = document.getElementById("summary-executed");
@@ -266,7 +268,11 @@ window.addEventListener("DOMContentLoaded", () => {
     renderDeviceChecklists(currentTestCases);
     updateSummary();
     appendLog("SYSTEM", `Loaded ${currentTestCases.length} test cases per device for Task ${task.toUpperCase()}.`, "success");
-    appendLog("SYSTEM", `Toolbar preset: task=${task}, skipPreconditions=${skipPreconditions.checked}, retry=${retryCount.value}`, "info");
+    appendLog(
+      "SYSTEM",
+      `Toolbar preset: task=${task}, skipPreconditions=${skipPreconditions.checked}, cleanupAfterTest=${cleanupAfterTest?.checked ?? false}, retry=${retryCount.value}`,
+      "info"
+    );
   });
 
   // --- Core App Logic ---
@@ -447,6 +453,7 @@ window.addEventListener("DOMContentLoaded", () => {
   function setLoadingState(loading, statusText = "Standby") {
     if (refreshBtn) refreshBtn.disabled = loading;
     if (runRealTestBtn) runRealTestBtn.disabled = loading;
+    if (getResultsBtn) getResultsBtn.disabled = loading || checkedDevices.size === 0;
     if (settingsBtn) settingsBtn.disabled = loading;
     if (stopBtn) stopBtn.style.display = loading ? "inline-block" : "none";
     if (appStatus) appStatus.textContent = statusText;
@@ -455,8 +462,20 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function updateRunButton() {
     const hasSelection = checkedDevices.size > 0;
+    if (getResultsBtn) getResultsBtn.disabled = !hasSelection || isRunInProgress;
     runRealTestBtn.disabled = !hasSelection;
     runRealTestBtn.textContent = `Run Selected (${checkedDevices.size})`;
+  }
+
+  async function pullResultsForDevice(id) {
+    const deviceObj = devices.find((device) => device.id === id);
+    const path = await invoke("pull_results", {
+      deviceId: id,
+      folderName: deviceObj ? getFolderName(deviceObj) : null,
+      basePath: customResultsPath || null,
+    });
+    appendLog(id, `Results saved to: ${path}`, "success");
+    return path;
   }
 
 
@@ -500,7 +519,11 @@ window.addEventListener("DOMContentLoaded", () => {
     updateSummary();
     const totalSelectedTests = Array.from(testsByDevice.values()).reduce((sum, tests) => sum + tests.length, 0);
     appendLog("SYSTEM", `Starting real instrumentation on ${selectedIds.length} devices for ${totalSelectedTests} selected device-tests...`, "info");
-    appendLog("SYSTEM", `Toolbar preset: task=${taskSelector.value}, skipPreconditions=${skipPreconditions.checked}, retry=${retryCount.value}, selectedDevices=${selectedIds.length}`, "info");
+    appendLog(
+      "SYSTEM",
+      `Toolbar preset: task=${taskSelector.value}, skipPreconditions=${skipPreconditions.checked}, cleanupAfterTest=${cleanupAfterTest?.checked ?? false}, retry=${retryCount.value}, selectedDevices=${selectedIds.length}`,
+      "info"
+    );
 
     const planStr = "normal";
 
@@ -553,7 +576,15 @@ window.addEventListener("DOMContentLoaded", () => {
          }
       }
 
-      if (allTestsPassed) {
+      // Legacy behavior: results are pulled via "Get Results" button.
+      if (cleanupAfterTest?.checked && allTestsPassed) {
+        appendLog(id, "Cleanup enabled; pulling results before uninstall...", "info");
+        try {
+          await pullResultsForDevice(id);
+        } catch(err) {
+          appendLog(id, `Failed to pull results before cleanup: ${err}`, "error");
+        }
+
         appendLog(id, "Flow passed. Cleaning up installed APKs...", "success");
         try {
           await invoke("cleanup_apks", { deviceId: id });
@@ -561,20 +592,13 @@ window.addEventListener("DOMContentLoaded", () => {
           appendLog(id, "Cleanup after passed flow failed: " + err, "error");
         }
       } else {
-        appendLog(id, "Flow did not fully pass; keeping APKs installed for debugging.", "info");
-      }
-
-      appendLog(id, "Pulling test results automatically...", "info");
-      const deviceObj = devices.find(d => d.id === id);
-      try {
-        const path = await invoke("pull_results", {
-          deviceId: id,
-          folderName: deviceObj ? getFolderName(deviceObj) : null,
-          basePath: customResultsPath || null
-        });
-        appendLog(id, `Results saved to: ${path}`, "success");
-      } catch(err) {
-        appendLog(id, `Failed to pull results: ${err}`, "error");
+        appendLog(
+          id,
+          cleanupAfterTest?.checked
+            ? "Flow did not fully pass; keeping APKs installed for debugging."
+            : "Cleanup disabled; keeping APKs installed.",
+          "info"
+        );
       }
       });
 
@@ -584,6 +608,46 @@ window.addEventListener("DOMContentLoaded", () => {
       setLoadingState(false);
       isRunInProgress = false;
     }
+  }
+
+  async function startGetResults() {
+    if (isRunInProgress) {
+      appendLog("SYSTEM", "Get Results is blocked while instrumentation is still active.", "info");
+      return;
+    }
+
+    const selectedIds = Array.from(checkedDevices);
+    if (selectedIds.length === 0) {
+      showError("Please select at least one device first.");
+      return;
+    }
+
+    setLoadingState(true, "Pulling Results...");
+    appendLog("SYSTEM", `Pulling results for ${selectedIds.length} devices...`, "info");
+    appendLog(
+      "SYSTEM",
+      `Toolbar preset: task=${taskSelector.value}, skipPreconditions=${skipPreconditions.checked}, cleanupAfterTest=${cleanupAfterTest?.checked ?? false}, retry=${retryCount.value}, selectedDevices=${selectedIds.length}`,
+      "info"
+    );
+
+    const promises = selectedIds.map(async (id) => {
+      try {
+        await pullResultsForDevice(id);
+        return true;
+      } catch (err) {
+        appendLog(id, `Failed to pull results: ${err}`, "error");
+        return false;
+      }
+    });
+
+    const results = await Promise.all(promises);
+    const successCount = results.filter(Boolean).length;
+    appendLog(
+      "SYSTEM",
+      `Result pull finished for ${successCount}/${selectedIds.length} device(s).`,
+      successCount === selectedIds.length ? "success" : "error"
+    );
+    setLoadingState(false);
   }
 
 
@@ -688,6 +752,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   runRealTestBtn.addEventListener("click", startRealInstrumentation);
+  if (getResultsBtn) getResultsBtn.addEventListener("click", startGetResults);
   stopBtn.addEventListener("click", () => {
     invoke("emergency_stop");
     appendLog("SYSTEM", "Emergency Stop Requested!", "error");
