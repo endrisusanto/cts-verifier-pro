@@ -61,21 +61,20 @@
           </label>
         </div>
 
-        <div class="breadcrumb-nav">
-          <button id="get-testcases-btn" class="btn">Get Testcases</button>
-          <button id="run-real-test" class="btn" disabled>Run Selected</button>
-          <button id="get-results-btn" class="btn" disabled>Get Results</button>
+        <div class="action-buttons">
+          <button id="get-testcases-btn" class="btn btn-action">Get Testcases</button>
+          <button id="run-real-test" class="btn btn-action" disabled>Run Selected</button>
+          <button id="get-results-btn" class="btn btn-action" disabled>Get Results</button>
         </div>
         <button id="emergency-stop" class="btn btn-ghost" style="color: #ff4d4d; border-color: rgba(255,77,77,0.2); display: none; margin-left: 10px;">Stop</button>
         
-        <select id="retry-count" class="btn btn-ghost" style="padding: 2px 8px; font-size: 0.7rem;">
-          <option value="0">Retry: 0</option>
-          <option value="1">Retry: 1</option>
-          <option value="2">Retry: 2</option>
-          <option value="3" selected>Retry: 3</option>
-        </select>
-        
         <div class="filters">
+          <select id="retry-count" class="btn btn-ghost" style="padding: 2px 8px; font-size: 0.7rem;">
+            <option value="0" selected>Retry: 0</option>
+            <option value="1">Retry: 1</option>
+            <option value="2">Retry: 2</option>
+            <option value="3">Retry: 3</option>
+          </select>
           <label class="cb-container-text">
             <input type="checkbox" id="filter-all"> <span class="checkmark-box"></span> All
           </label>
@@ -85,25 +84,13 @@
         </div>
       </div>
       
-      <div class="table-container">
-        <table id="checklist-table">
-          <thead>
-            <tr>
-              <th width="10%">Select</th>
-              <th width="50%">Testcase</th>
-              <th width="20%">Result</th>
-              <th width="20%">Time</th>
-            </tr>
-          </thead>
-          <tbody id="checklist-body">
-            <!-- Mock rows will be injected by JS for now -->
-            <tr><td colspan="4" style="text-align: center; color: #666; padding: 40px;">Select a device and click "Get Test case"</td></tr>
-          </tbody>
-        </table>
+      <div id="checklists-container" class="table-container">
+        <div class="empty-checklist">Select device(s) and click "Get Testcases"</div>
       </div>
     </section>
 
     <!-- Right Pane: Summary & Logs -->
+    <div id="sidebar-logs-resizer" class="sidebar-logs-resizer" title="Resize logs"></div>
     <aside class="sidebar-logs">
       <div class="summary-panel">
         <h3 class="panel-title">Summarize</h3>

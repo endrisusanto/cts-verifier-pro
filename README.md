@@ -1,83 +1,162 @@
-# 🚀 CTS Verifier Pro (Industrial Edition)
+# CTS Verifier Pro
 
-![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-blue)
-![Tech](https://img.shields.io/badge/tech-Tauri%20%7C%20Rust%20%7C%20JS-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
+CTS Verifier Pro adalah aplikasi desktop berbasis Tauri untuk otomasi CTS Verifier Android dengan dukungan multi-device, precondition setup, instrumentation run, pull result, dan resource APK eksternal.
 
-**CTS Verifier Pro** adalah aplikasi desktop modern berbasis **Tauri** dan **Rust** yang dirancang khusus untuk mempercepat proses kualifikasi Google Android melalui otomatisasi instalasi APK CTS Verifier. 
+## Fitur
 
-Aplikasi ini menggantikan metode skrip batch tradisional dengan antarmuka grafis yang canggih, mendukung eksekusi paralel pada banyak perangkat sekaligus, dan memberikan detail properti perangkat secara real-time.
+- Menjalankan flow CTS Verifier ke banyak device sekaligus.
+- Resource APK dipisah dari installer agar update resource tidak perlu rebuild app.
+- Paket rilis otomatis untuk Linux `deb/rpm` dan Windows `exe`.
+- GitHub Release otomatis saat push tag `v*`.
+- GitHub Pages untuk halaman download dan panduan instalasi singkat.
 
----
+## Struktur Resource
 
-## ✨ Fitur Unggulan
+Installer tidak membundel APK resource. Resource harus dipasang terpisah dalam folder `resources/` atau diarahkan lewat environment variable `CTS_VERIFIER_RESOURCE_DIR`.
 
-- ⚡ **Parallel Multi-Installation**: Instalasi APK ke banyak perangkat Android secara bersamaan (Async Execution).
-- 📱 **Detailed Device Discovery**: Menampilkan properti teknis lengkap seperti Android Version, SDK, Security Patch, Carrier, Region, dan PDA.
-- 🎨 **Industrial Dark UI**: Antarmuka modern dengan *glassmorphism* dan tema gelap yang nyaman untuk penggunaan durasi lama.
-- 📊 **Real-time Console Log**: Monitor setiap langkah instalasi dengan konsol log terintegrasi yang mendetail.
-- 📦 **All-in-One Bundling**: Folder APK (`apks/`) sudah tersemat langsung di dalam aplikasi (Resources), tidak perlu konfigurasi folder manual.
-- 🛠️ **Automated Configuration**: Secara otomatis mengatur `Device Owner`, memberikan izin `read_device_identifiers`, dan `MANAGE_EXTERNAL_STORAGE`.
-
----
-
-## 🛠️ Persyaratan Sistem
-
-- **Linux**: Perangkat lunak `adb` (android-tools) harus terpasang.
-- **Windows**: Perangkat lunak `adb` harus terdaftar di System PATH.
-- **Android**: Perangkat harus dalam mode `USB Debugging` aktif.
-
----
-
-## 📥 Instalasi & Penggunaan
-
-### Menggunakan Installer (Rekomendasi)
-Unduh installer terbaru dari halaman [Releases](https://github.com/endrisusanto/cts-verifier-pro/releases):
-- **Linux (Fedora/RPM)**: `sudo dnf install ./cts-verifier-pro-1.0.0.rpm`
-- **Linux (Debian/Ubuntu)**: `sudo dpkg -i cts-verifier-pro_1.0.0.deb`
-- **Windows**: Jalankan `cts-verifier-pro_1.0.0_x64_en-US.msi`
-
-### Menjalankan dari Source Code
-Jika Anda ingin mengembangkan atau menjalankan dari source:
-1. Clone repository:
-   ```bash
-   git clone https://github.com/endrisusanto/cts-verifier-pro.git
-   cd cts-verifier-pro
-   ```
-2. Install dependensi:
-   ```bash
-   npm install
-   ```
-3. Jalankan mode pengembangan:
-   ```bash
-   npm run tauri dev
-   ```
-
----
-
-## 🚀 Workflow GitHub Actions
-
-Proyek ini dilengkapi dengan CI/CD otomatis. Setiap kali Anda membuat tag rilis (`v*`), GitHub Actions akan otomatis membangun:
-- Installer `.exe` dan `.msi` (Windows)
-- Installer `.deb` dan `.rpm` (Linux)
-
-Cara membuat rilis baru:
-```bash
-git tag -a v1.0.0 -m "Initial Industrial Release"
-git push origin v1.0.0
+```text
+resources/
+  ApkTest/
+    AutoCtsVerifier-debug.apk
+    AutoCtsVerifier-debug-androidTest.apk
+  Normal/
+    13/
+    14/
+    15/
+    16/
 ```
 
----
+Urutan pencarian resource:
 
-## 🤝 Kontribusi
+- `CTS_VERIFIER_RESOURCE_DIR`
+- folder `resources/` di samping binary
+- fallback development path di workspace
 
-Kontribusi selalu terbuka! Silakan buat *Issue* atau kirimkan *Pull Request* untuk peningkatan fitur.
+## Menjalankan dari Source
 
----
+```bash
+npm install
+npm run tauri dev
+```
 
-## 📄 Lisensi
+Contoh override resource:
 
-Didistribusikan di bawah Lisensi MIT. Lihat `LICENSE` untuk informasi lebih lanjut.
+```bash
+export CTS_VERIFIER_RESOURCE_DIR=/path/to/resources
+npm run tauri dev
+```
 
----
-**Developed by Endri Pro** - *Optimizing Android Automation Suite*
+## Build Lokal
+
+### Linux
+
+Menghasilkan installer `deb`, `rpm`, folder `releases/resources`, dan `releases/cts-verifier-resources.zip`.
+
+```bash
+npm run build:linux
+```
+
+### Windows
+
+Menghasilkan installer `exe` NSIS, folder `releases/resources`, dan `releases/cts-verifier-resources.zip`.
+
+```bash
+npm run build:windows
+```
+
+### Auto
+
+Memilih platform berdasarkan host saat ini.
+
+```bash
+npm run build:auto
+```
+
+## Instalasi dari Release
+
+Unduh asset dari:
+
+- Release GitHub: `https://github.com/endrisusanto/cts-verifier-pro/releases/latest`
+- GitHub Pages: `https://endrisusanto.github.io/cts-verifier-pro/`
+
+### Linux Debian/Ubuntu
+
+```bash
+sudo dpkg -i ./cts-verifier-pro_*.deb
+```
+
+### Linux Fedora/RHEL
+
+```bash
+sudo dnf install ./cts-verifier-pro-*.rpm
+```
+
+### Windows
+
+- Jalankan file installer `*.exe`.
+
+### Pasang Resource Terpisah
+
+1. Unduh `cts-verifier-resources.zip`.
+2. Ekstrak menjadi folder `resources/`.
+3. Letakkan folder `resources/` di samping binary/aplikasi, atau set:
+
+```bash
+export CTS_VERIFIER_RESOURCE_DIR=/path/to/resources
+```
+
+## Release dengan Git Tag
+
+Workflow release ada di `.github/workflows/release.yml`. Saat tag `v*` di-push, workflow akan:
+
+- build `deb`
+- build `rpm`
+- build `exe`
+- membuat `cts-verifier-resources.zip`
+- membuat draft GitHub Release
+
+Langkah rilis:
+
+```bash
+git checkout main
+git pull
+git tag -a v1.4.0 -m "Release v1.4.0"
+git push origin v1.4.0
+```
+
+Setelah workflow selesai:
+
+1. Buka tab Actions.
+2. Pastikan job `Release` sukses.
+3. Buka halaman draft release.
+4. Verifikasi asset installer dan `cts-verifier-resources.zip`.
+5. Publish release.
+
+## GitHub Pages
+
+Halaman statis ada di `docs/index.html`, dan deploy workflow ada di `.github/workflows/pages.yml`.
+
+Aktifkan sekali di repository settings:
+
+1. Buka `Settings`
+2. Masuk ke `Pages`
+3. Pastikan source menggunakan `GitHub Actions`
+
+Setelah itu, push ke `main` akan otomatis deploy halaman `docs/`.
+
+## Timeout Instrumentation
+
+Jika perlu ubah timeout guard:
+
+```bash
+export CTS_VERIFIER_TEST_TIMEOUT_SECS=600
+export CTS_VERIFIER_TEST_IDLE_TIMEOUT_SECS=180
+```
+
+## File Penting
+
+- Build script: `build.sh`
+- Release workflow: `.github/workflows/release.yml`
+- Pages workflow: `.github/workflows/pages.yml`
+- Pages index: `docs/index.html`
+- Tauri config: `src-tauri/tauri.conf.json`

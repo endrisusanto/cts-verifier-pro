@@ -1,12 +1,15 @@
 {
   "name": "cts-verifier-installer",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build"
+    "build": "tauri build",
+    "build:linux": "bash ./build.sh linux",
+    "build:windows": "bash ./build.sh windows",
+    "build:auto": "bash ./build.sh auto"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
