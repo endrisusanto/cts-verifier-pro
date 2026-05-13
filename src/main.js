@@ -17,7 +17,6 @@ window.addEventListener("DOMContentLoaded", () => {
   const taskSelector = document.getElementById("task-selector");
   const skipPreconditions = document.getElementById("skip-preconditions");
   const retryCount = document.getElementById("retry-count");
-  const getResultsBtn = document.getElementById("get-results-btn");
   const clearLogBtn = document.getElementById("clear-log-btn");
   const checklistsContainer = document.getElementById("checklists-container");
   const summaryExecuted = document.getElementById("summary-executed");
@@ -447,7 +446,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function setLoadingState(loading, statusText = "Standby") {
     if (refreshBtn) refreshBtn.disabled = loading;
-    if (getResultsBtn) getResultsBtn.disabled = loading;
     if (runRealTestBtn) runRealTestBtn.disabled = loading;
     if (settingsBtn) settingsBtn.disabled = loading;
     if (stopBtn) stopBtn.style.display = loading ? "inline-block" : "none";
@@ -457,7 +455,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function updateRunButton() {
     const hasSelection = checkedDevices.size > 0;
-    getResultsBtn.disabled = !hasSelection;
     runRealTestBtn.disabled = !hasSelection;
     runRealTestBtn.textContent = `Run Selected (${checkedDevices.size})`;
   }
@@ -566,6 +563,19 @@ window.addEventListener("DOMContentLoaded", () => {
       } else {
         appendLog(id, "Flow did not fully pass; keeping APKs installed for debugging.", "info");
       }
+
+      appendLog(id, "Pulling test results automatically...", "info");
+      const deviceObj = devices.find(d => d.id === id);
+      try {
+        const path = await invoke("pull_results", {
+          deviceId: id,
+          folderName: deviceObj ? getFolderName(deviceObj) : null,
+          basePath: customResultsPath || null
+        });
+        appendLog(id, `Results saved to: ${path}`, "success");
+      } catch(err) {
+        appendLog(id, `Failed to pull results: ${err}`, "error");
+      }
       });
 
       await Promise.all(promises);
@@ -576,38 +586,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function startGetResults() {
-    if (isRunInProgress) {
-      appendLog("SYSTEM", "Get Results is blocked while instrumentation is still active.", "info");
-      return;
-    }
 
-    const selectedIds = Array.from(checkedDevices);
-    setLoadingState(true, "Pulling Results...");
-    appendLog("SYSTEM", `Pulling results for ${selectedIds.length} devices...`, "info");
-    appendLog("SYSTEM", `Toolbar preset: task=${taskSelector.value}, skipPreconditions=${skipPreconditions.checked}, retry=${retryCount.value}, selectedDevices=${selectedIds.length}`, "info");
-
-    const promises = selectedIds.map(async (id) => {
-      const deviceObj = devices.find(d => d.id === id);
-      try {
-        const path = await invoke("pull_results", {
-          deviceId: id,
-          folderName: deviceObj ? getFolderName(deviceObj) : null,
-          basePath: customResultsPath || null
-        });
-        appendLog(id, `Results saved to: ${path}`, "success");
-        return true;
-      } catch(err) {
-        appendLog(id, `Failed to pull results: ${err}`, "error");
-        return false;
-      }
-    });
-
-    const results = await Promise.all(promises);
-    const successCount = results.filter(Boolean).length;
-    appendLog("SYSTEM", `Result pull finished for ${successCount}/${selectedIds.length} device(s).`, successCount === selectedIds.length ? "success" : "error");
-    setLoadingState(false);
-  }
 
   listen("install-log", (event) => {
     const { device_id, message, status, progress } = event.payload;
@@ -709,7 +688,6 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   runRealTestBtn.addEventListener("click", startRealInstrumentation);
-  getResultsBtn.addEventListener("click", startGetResults);
   stopBtn.addEventListener("click", () => {
     invoke("emergency_stop");
     appendLog("SYSTEM", "Emergency Stop Requested!", "error");

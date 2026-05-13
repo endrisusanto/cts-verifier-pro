@@ -170,7 +170,7 @@ select option {
 
 #get-testcases-btn:not(:disabled) { color: #fff; }
 #run-real-test:not(:disabled) { color: #3ddc84; }
-#get-results-btn:not(:disabled) { color: #58a6ff; }
+
 
 .btn-action:disabled {
   opacity: 0.3;
