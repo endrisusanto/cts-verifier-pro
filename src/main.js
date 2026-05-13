@@ -197,17 +197,19 @@ window.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="device-checklist-meta">${tests.length} testcase(s)</div>
         </div>
-        <table class="checklist-table">
-          <thead>
-            <tr>
-              <th width="10%">Select</th>
-              <th width="50%">Testcase</th>
-              <th width="20%">Result</th>
-              <th width="20%">Time</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="checklist-table-wrapper">
+          <table class="checklist-table">
+            <thead>
+              <tr>
+                <th width="10%">Select</th>
+                <th width="50%">Testcase</th>
+                <th width="20%">Result</th>
+                <th width="20%">Time</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       `;
       const body = card.querySelector("tbody");
       tests.forEach(test => body.appendChild(createChecklistRow(deviceId, test)));

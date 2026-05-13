@@ -57,14 +57,15 @@ header {
 }
 
 .sidebar-devices {
-  width: 280px;
-  min-width: 280px;
-  max-width: 280px;
-  flex: 0 0 280px;
+  width: 330px;
+  min-width: 330px;
+  max-width: 330px;
+  flex: 0 0 330px;
   background: var(--bg-main);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .sidebar-header {
@@ -102,9 +103,10 @@ header {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
-.device-card.checked { border-color: var(--blue); background: rgba(66, 133, 244, 0.03); }
+.device-card.checked { border-color: var(--blue); background: rgba(66, 133, 244, 0.03); min-width: 300px; min-height: 120px; flex-shrink: 0; }
 
 .device-card-top {
   display: flex;
@@ -289,7 +291,23 @@ select option {
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
 }
+
+.device-checklist-card .checklist-table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Scrollbar for checklist */
+.device-checklist-card .checklist-table-wrapper::-webkit-scrollbar { width: 6px; }
+.device-checklist-card .checklist-table-wrapper::-webkit-scrollbar-track { background: transparent; }
+.device-checklist-card .checklist-table-wrapper::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+.device-checklist-card .checklist-table-wrapper::-webkit-scrollbar-thumb:hover { background: #444; }
 
 .device-checklist-header {
   padding: 10px 14px;
