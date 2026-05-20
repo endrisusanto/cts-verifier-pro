@@ -46,8 +46,14 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // --- Settings Logic ---
   let customResultsPath = localStorage.getItem("resultsPath") || "";
+  let savedTask = localStorage.getItem("taskSetting") || "cts-verifier-normal";
+  let savedSkipPreconditions = localStorage.getItem("skipPreconditions") === "true";
+  let savedCleanupAfterTest = localStorage.getItem("cleanupAfterTest") === "true";
 
   resultsPathInput.value = customResultsPath;
+  if (taskSelector) taskSelector.value = savedTask;
+  if (skipPreconditions) skipPreconditions.checked = savedSkipPreconditions;
+  if (cleanupAfterTest) cleanupAfterTest.checked = savedCleanupAfterTest;
 
   settingsBtn.addEventListener("click", () => {
     settingsModal.style.display = "flex";
@@ -67,6 +73,10 @@ window.addEventListener("DOMContentLoaded", () => {
   saveSettingsBtn.addEventListener("click", () => {
     customResultsPath = resultsPathInput.value;
     localStorage.setItem("resultsPath", customResultsPath);
+    
+    if (taskSelector) localStorage.setItem("taskSetting", taskSelector.value);
+    if (skipPreconditions) localStorage.setItem("skipPreconditions", skipPreconditions.checked);
+    if (cleanupAfterTest) localStorage.setItem("cleanupAfterTest", cleanupAfterTest.checked);
 
     settingsModal.style.display = "none";
     appendLog("SYSTEM", `Settings saved. Results path: ${customResultsPath || './results'}`, "success");
